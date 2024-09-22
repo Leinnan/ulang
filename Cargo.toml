@@ -1,0 +1,11 @@
+[package]
+name = "ulang"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[[bin]]
+name = "ulang_drive"
+test = false
+bench = false
