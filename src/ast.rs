@@ -8,6 +8,9 @@ pub enum AstNode {
 
     // Represents a function declaration
     FunctionDeclaration(FunctionDecl),
+
+    // Represents a program
+    Program(Vec<AstNode>)
 }
 
 #[derive(Debug, Clone)]

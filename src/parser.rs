@@ -10,7 +10,7 @@ impl Parser {
         Parser { tokens, pos: 0 }
     }
 
-    pub fn parse(&mut self) -> Vec<AstNode> {
+    pub fn parse(&mut self) -> Result<AstNode, String> {
         let mut nodes = Vec::new();
         while self.pos < self.tokens.len() {
             if let Some(function) = self.parse_function() {
@@ -19,7 +19,11 @@ impl Parser {
                 break;
             }
         }
-        nodes
+        if nodes.is_empty() {
+            Err("No valid functions".into())
+        } else {
+            Ok(AstNode::Program(nodes))
+        }
     }
     fn parse_function(&mut self) -> Option<FunctionDecl> {
         let return_type = if self.match_token(&Token::IntKeyword) {

@@ -58,7 +58,13 @@ fn main() {
     }
 
     let mut parser = Parser::new(tokens);
-    let ast = parser.parse();
+    let ast = match parser.parse() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("Error during parsing: {}", e);
+            exit(2);
+        }
+    };
     println!("{:#?}", ast);
 
     if opt.parse {
