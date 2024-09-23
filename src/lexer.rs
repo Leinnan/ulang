@@ -1,6 +1,6 @@
 use std::iter::{self, from_fn};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     Identifier(String),
     Constant(i32),
@@ -48,10 +48,8 @@ pub fn tokenizer(input: String) -> Vec<Token> {
                 } else if iter.next_if(|s| s.eq(&'*')).is_some() {
                     // Multiline comment (/* */)
                     while let Some(ch) = iter.next() {
-                        if ch == '*' {
-                            if iter.next_if(|s| s.eq(&'/')).is_some() {
-                                break; // End of the multiline comment
-                            }
+                        if ch == '*' && iter.next_if(|s| s.eq(&'/')).is_some() {
+                            break; // End of the multiline comment
                         }
                     }
                 } else {
@@ -67,7 +65,7 @@ pub fn tokenizer(input: String) -> Vec<Token> {
                     .collect::<String>()
                     .parse()
                     .unwrap();
-                println!("Identifier: {}", &n);
+
                 let token = KEYWORDS
                     .iter()
                     .find(|(_, s)| s.eq(&n))
