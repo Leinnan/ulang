@@ -12,7 +12,6 @@ pub enum Token {
     OpenBrace,
     CloseBrace,
     Semicolon,
-    Comment
 }
 
 const KEYWORDS: [(Token, &str); 3] = [
@@ -43,22 +42,27 @@ pub fn tokenizer(input: String) -> Vec<Token> {
                 tokens.push(Token::Constant(n));
             }
             '/' => {
-                if iter.next_if(|s|s.eq(&'/')).is_some() {
-                    let n: String = iter::once(ch)
-                    .chain(from_fn(|| {
-                        iter.by_ref().next_if(|s| !s.eq(&'\n'))
-                    }))
-                    .collect::<String>()
-                    .parse()
-                    .unwrap();
-                println!("Comment: /{}", &n);
-                    
+                if iter.next_if(|s| s.eq(&'/')).is_some() {
+                    // Single line comment (//)
+                    iter.by_ref().find(|&c| c == '\n'); // Skip until end of the line
+                } else if iter.next_if(|s| s.eq(&'*')).is_some() {
+                    // Multiline comment (/* */)
+                    while let Some(ch) = iter.next() {
+                        if ch == '*' {
+                            if iter.next_if(|s| s.eq(&'/')).is_some() {
+                                break; // End of the multiline comment
+                            }
+                        }
+                    }
+                } else {
+                    // If it's not part of a comment, you can handle it as an error or another token
+                    panic!("Unexpected '/' character");
                 }
             }
             ch if ch.is_ascii_alphabetic() => {
                 let n: String = iter::once(ch)
                     .chain(from_fn(|| {
-                        iter.by_ref().next_if(|s| s.is_ascii_alphabetic())
+                        iter.by_ref().next_if(|s| s.is_ascii_alphanumeric())
                     }))
                     .collect::<String>()
                     .parse()
