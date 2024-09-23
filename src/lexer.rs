@@ -40,6 +40,11 @@ pub fn tokenizer(input: String) -> Vec<Token> {
                     .unwrap();
 
                 tokens.push(Token::Constant(n));
+                if let Some(next_ch) = iter.peek() {
+                    if next_ch.is_alphabetic() {
+                        panic!("FAILED, next char after number {} is {}", &n, next_ch);
+                    }
+                }
             }
             '/' => {
                 if iter.next_if(|s| s.eq(&'/')).is_some() {

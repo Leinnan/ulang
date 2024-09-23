@@ -56,7 +56,7 @@ fn main() {
     if opt.lex {
         exit(0);
     }
-    
+
     let mut parser = Parser::new(tokens);
     let ast = parser.parse();
     println!("{:#?}", ast);

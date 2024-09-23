@@ -77,7 +77,11 @@ impl Parser {
         if self.match_token(&Token::IntKeyword) {
             return self.parse_variable_declaration();
         } else if self.match_token(&Token::ReturnKeyWord) {
-            return self.parse_return_statement();
+            let result = self.parse_return_statement();
+            if result.is_none() {
+                std::process::exit(1);
+            }
+            return Some(result.expect("Cannot parse return"));
         }
         None
     }
