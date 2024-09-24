@@ -24,23 +24,34 @@ impl Parser {
             Ok(AstNode::Program(nodes))
         }
     }
-    fn parse_function(&mut self) -> Result<FunctionDecl,String> {
+    fn parse_function(&mut self) -> Result<FunctionDecl, String> {
         let return_type = if self.match_token(&Token::IntKeyword) {
             VarType::Int
         } else if self.match_token(&Token::VoidKeyWord) {
             VarType::Void
         } else {
-            return Err(format!("Expected type keyword, found: {} instead", self.peek().unwrap()));
+            return Err(format!(
+                "Expected type keyword, found: {} instead",
+                self.peek().unwrap()
+            ));
         };
 
         let name = if let Some(Token::Identifier(name)) = self.advance() {
             name.clone()
         } else {
-            return Err(format!("After type {:?} keyword function name is expected, found: {} instead",&return_type, self.peek().unwrap()));
+            return Err(format!(
+                "After type {:?} keyword function name is expected, found: {} instead",
+                &return_type,
+                self.peek().unwrap()
+            ));
         };
 
         if !self.match_token(&Token::OpenParenthesis) {
-            return Err(format!("After function {} parser expects {{, found: {} instead", &name, self.peek().unwrap()));
+            return Err(format!(
+                "After function {} parser expects {{, found: {} instead",
+                &name,
+                self.peek().unwrap()
+            ));
         }
 
         // Parse parameters (ignoring for simplicity in this example)
@@ -52,7 +63,10 @@ impl Parser {
         }
 
         if !self.match_token(&Token::OpenBrace) {
-            return Err(format!("Expected (, found: {} instead", self.peek().unwrap()));
+            return Err(format!(
+                "Expected (, found: {} instead",
+                self.peek().unwrap()
+            ));
         }
 
         let body = match self.parse_compound_statement() {
@@ -61,7 +75,10 @@ impl Parser {
         };
 
         if !self.match_token(&Token::CloseBrace) {
-            return Err(format!("Expected ), found: {} instead", self.peek().unwrap()));
+            return Err(format!(
+                "Expected ), found: {} instead",
+                self.peek().unwrap()
+            ));
         }
 
         Ok(FunctionDecl {
@@ -72,14 +89,14 @@ impl Parser {
         })
     }
 
-    fn parse_compound_statement(&mut self) -> Result<Statement,String> {
+    fn parse_compound_statement(&mut self) -> Result<Statement, String> {
         let mut statements = Vec::new();
         // println!("ONE");
         while !self.check_token(&Token::CloseBrace) && self.pos < self.tokens.len() {
             // println!(" Try");
             match self.parse_statement() {
                 Ok(s) => statements.push(s),
-                Err(e) => return Err(format!("Failed to parse statement: {}",e))
+                Err(e) => return Err(format!("Failed to parse statement: {}", e)),
             };
         }
         // println!("TWO");
@@ -92,14 +109,20 @@ impl Parser {
         } else if self.match_token(&Token::ReturnKeyWord) {
             return self.parse_return_statement();
         }
-        Err(format!("Expected statement, found {}", self.peek().unwrap()))
+        Err(format!(
+            "Expected statement, found {}",
+            self.peek().unwrap()
+        ))
     }
 
-    fn parse_variable_declaration(&mut self) -> Result<Statement,String> {
+    fn parse_variable_declaration(&mut self) -> Result<Statement, String> {
         let name = if let Some(Token::Identifier(name)) = self.advance() {
             name.clone()
         } else {
-            return Err(format!("Expected variable name, found: {}",self.peek().unwrap()));
+            return Err(format!(
+                "Expected variable name, found: {}",
+                self.peek().unwrap()
+            ));
         };
 
         let initializer = if self.match_token(&Token::Semicolon) {
@@ -108,10 +131,16 @@ impl Parser {
             if self.match_token(&Token::Semicolon) {
                 Some(expression)
             } else {
-                return Err(format!("Expected semicolon, found: {}",self.peek().unwrap()));
+                return Err(format!(
+                    "Expected semicolon, found: {}",
+                    self.peek().unwrap()
+                ));
             }
         } else {
-            return Err(format!("Expected Expression, found: {}",self.peek().unwrap()));
+            return Err(format!(
+                "Expected Expression, found: {}",
+                self.peek().unwrap()
+            ));
         };
 
         Ok(Statement::VariableDeclaration {
@@ -121,7 +150,7 @@ impl Parser {
         })
     }
 
-    fn parse_return_statement(&mut self) -> Result<Statement,String> {
+    fn parse_return_statement(&mut self) -> Result<Statement, String> {
         let expr = if !self.check_token(&Token::Semicolon) {
             self.parse_expression()
         } else {
@@ -161,7 +190,9 @@ impl Parser {
         }
     }
 
-    fn peek(&self) -> Option<&Token> {self.tokens.get(self.pos)}
+    fn peek(&self) -> Option<&Token> {
+        self.tokens.get(self.pos)
+    }
 
     fn advance(&mut self) -> Option<&Token> {
         if self.pos < self.tokens.len() {

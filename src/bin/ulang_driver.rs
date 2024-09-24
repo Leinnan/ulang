@@ -1,6 +1,6 @@
 use std::{fs, path::PathBuf, process::exit};
 use structopt::StructOpt;
-use ulang::parser::Parser;
+use ulang::{code_gen, parser::Parser};
 
 /// Simple C lang compiler driver
 #[derive(StructOpt, Debug)]
@@ -68,6 +68,13 @@ fn main() {
     println!("{:#?}", ast);
 
     if opt.parse {
+        exit(0);
+    }
+
+    let assembly = code_gen::generate_assembly(&ast);
+    println!("{}", assembly.expect("Failed to generate ASM"));
+
+    if opt.codegen {
         exit(0);
     }
 }

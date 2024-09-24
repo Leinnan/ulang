@@ -10,7 +10,7 @@ pub enum AstNode {
     FunctionDeclaration(FunctionDecl),
 
     // Represents a program
-    Program(Vec<AstNode>)
+    Program(Vec<AstNode>),
 }
 
 #[derive(Debug, Clone)]
