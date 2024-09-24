@@ -1,4 +1,4 @@
-use std::iter::{self, from_fn};
+use std::{fmt::Display, iter::{self, from_fn}};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
@@ -12,6 +12,23 @@ pub enum Token {
     OpenBrace,
     CloseBrace,
     Semicolon,
+}
+
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Token::Identifier(id) => f.write_str(&id),
+            Token::Constant(i) => f.write_str(&i.to_string()),
+            Token::IntKeyword => f.write_str("int"),
+            Token::VoidKeyWord => f.write_str("void"),
+            Token::ReturnKeyWord => f.write_str("return"),
+            Token::OpenParenthesis => f.write_str("{"),
+            Token::CloseParenthesis => f.write_str("}"),
+            Token::OpenBrace => f.write_str("("),
+            Token::CloseBrace => f.write_str(")"),
+            Token::Semicolon => f.write_str(";"),
+        }
+    }
 }
 
 const KEYWORDS: [(Token, &str); 3] = [

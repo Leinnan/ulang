@@ -13,10 +13,9 @@ impl Parser {
     pub fn parse(&mut self) -> Result<AstNode, String> {
         let mut nodes = Vec::new();
         while self.pos < self.tokens.len() {
-            if let Some(function) = self.parse_function() {
-                nodes.push(AstNode::FunctionDeclaration(function));
-            } else {
-                break;
+            match self.parse_function() {
+                Ok(fun) => nodes.push(AstNode::FunctionDeclaration(fun)),
+                Err(e) => return Err(format!("Function parsing error: {} instead", e)),
             }
         }
         if nodes.is_empty() {
@@ -25,41 +24,47 @@ impl Parser {
             Ok(AstNode::Program(nodes))
         }
     }
-    fn parse_function(&mut self) -> Option<FunctionDecl> {
+    fn parse_function(&mut self) -> Result<FunctionDecl,String> {
         let return_type = if self.match_token(&Token::IntKeyword) {
             VarType::Int
         } else if self.match_token(&Token::VoidKeyWord) {
             VarType::Void
         } else {
-            return None;
+            return Err(format!("Expected type keyword, found: {} instead", self.peek().unwrap()));
         };
 
         let name = if let Some(Token::Identifier(name)) = self.advance() {
             name.clone()
         } else {
-            return None;
+            return Err(format!("After type {:?} keyword function name is expected, found: {} instead",&return_type, self.peek().unwrap()));
         };
 
         if !self.match_token(&Token::OpenParenthesis) {
-            return None;
+            return Err(format!("After function {} parser expects {{, found: {} instead", &name, self.peek().unwrap()));
         }
 
         // Parse parameters (ignoring for simplicity in this example)
         while !self.match_token(&Token::CloseParenthesis) {
-            self.advance(); // Skip until ')'
+            let is_some = self.advance().is_some(); // Skip until ')'
+            if !is_some {
+                return Err("Failed to find parameters clousure".into());
+            }
         }
 
         if !self.match_token(&Token::OpenBrace) {
-            return None;
+            return Err(format!("Expected (, found: {} instead", self.peek().unwrap()));
         }
 
-        let body = self.parse_compound_statement();
+        let body = match self.parse_compound_statement() {
+            Ok(b) => b,
+            Err(e) => return Err(format!("Failed to parse function body: {}", e)),
+        };
 
         if !self.match_token(&Token::CloseBrace) {
-            return None;
+            return Err(format!("Expected ), found: {} instead", self.peek().unwrap()));
         }
 
-        Some(FunctionDecl {
+        Ok(FunctionDecl {
             return_type,
             name,
             parameters: Vec::new(), // Skipping parameter parsing for now
@@ -67,34 +72,34 @@ impl Parser {
         })
     }
 
-    fn parse_compound_statement(&mut self) -> Statement {
+    fn parse_compound_statement(&mut self) -> Result<Statement,String> {
         let mut statements = Vec::new();
+        // println!("ONE");
         while !self.check_token(&Token::CloseBrace) && self.pos < self.tokens.len() {
-            if let Some(statement) = self.parse_statement() {
-                statements.push(statement);
-            }
+            // println!(" Try");
+            match self.parse_statement() {
+                Ok(s) => statements.push(s),
+                Err(e) => return Err(format!("Failed to parse statement: {}",e))
+            };
         }
-        Statement::Compound(statements)
+        // println!("TWO");
+        Ok(Statement::Compound(statements))
     }
 
-    fn parse_statement(&mut self) -> Option<Statement> {
+    fn parse_statement(&mut self) -> Result<Statement, String> {
         if self.match_token(&Token::IntKeyword) {
             return self.parse_variable_declaration();
         } else if self.match_token(&Token::ReturnKeyWord) {
-            let result = self.parse_return_statement();
-            if result.is_none() {
-                std::process::exit(1);
-            }
-            return Some(result.expect("Cannot parse return"));
+            return self.parse_return_statement();
         }
-        None
+        Err(format!("Expected statement, found {}", self.peek().unwrap()))
     }
 
-    fn parse_variable_declaration(&mut self) -> Option<Statement> {
+    fn parse_variable_declaration(&mut self) -> Result<Statement,String> {
         let name = if let Some(Token::Identifier(name)) = self.advance() {
             name.clone()
         } else {
-            return None;
+            return Err(format!("Expected variable name, found: {}",self.peek().unwrap()));
         };
 
         let initializer = if self.match_token(&Token::Semicolon) {
@@ -103,20 +108,20 @@ impl Parser {
             if self.match_token(&Token::Semicolon) {
                 Some(expression)
             } else {
-                return None;
+                return Err(format!("Expected semicolon, found: {}",self.peek().unwrap()));
             }
         } else {
-            return None;
+            return Err(format!("Expected Expression, found: {}",self.peek().unwrap()));
         };
 
-        Some(Statement::VariableDeclaration {
+        Ok(Statement::VariableDeclaration {
             var_type: VarType::Int,
             name,
             initializer,
         })
     }
 
-    fn parse_return_statement(&mut self) -> Option<Statement> {
+    fn parse_return_statement(&mut self) -> Result<Statement,String> {
         let expr = if !self.check_token(&Token::Semicolon) {
             self.parse_expression()
         } else {
@@ -124,9 +129,9 @@ impl Parser {
         };
 
         if self.match_token(&Token::Semicolon) {
-            Some(Statement::ReturnStatement(expr))
+            Ok(Statement::ReturnStatement(expr))
         } else {
-            None
+            Err("Missing semicolon".into())
         }
     }
 
@@ -155,6 +160,8 @@ impl Parser {
             false
         }
     }
+
+    fn peek(&self) -> Option<&Token> {self.tokens.get(self.pos)}
 
     fn advance(&mut self) -> Option<&Token> {
         if self.pos < self.tokens.len() {
