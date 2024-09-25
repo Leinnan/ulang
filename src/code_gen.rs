@@ -1,6 +1,12 @@
 use crate::ast::AstNode;
 
-pub fn generate_assembly(root_node: &AstNode) -> Result<String, String> {
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum TargetPlatform {
+    MacOsX64,
+    X64Linux,
+}
+
+pub fn generate_assembly(root_node: &AstNode, platform: TargetPlatform) -> Result<String, String> {
     let mut result = String::with_capacity(500);
     let program = match root_node {
         AstNode::Program(fun) => fun,
@@ -14,15 +20,11 @@ pub fn generate_assembly(root_node: &AstNode) -> Result<String, String> {
         result += &format!("\t.globl {}\n", function_decl.name);
         result += &format!(".{}\n", function_decl.name);
         match &function_decl.body {
-            crate::ast::Statement::VariableDeclaration {
-                ..
-            } => todo!(),
+            crate::ast::Statement::VariableDeclaration { .. } => todo!(),
             crate::ast::Statement::Compound(vec) => {
                 for st in vec {
                     match st {
-                        crate::ast::Statement::VariableDeclaration {
-                           ..
-                        } => todo!(),
+                        crate::ast::Statement::VariableDeclaration { .. } => todo!(),
                         crate::ast::Statement::ReturnStatement(expression) => {
                             if let Some(e) = expression {
                                 match e {
@@ -30,7 +32,7 @@ pub fn generate_assembly(root_node: &AstNode) -> Result<String, String> {
                                         result += &format!("\tmovl\t${}, %eax\n", constant);
                                     }
                                     crate::ast::Expression::Identifier(_) => todo!(),
-                                    crate::ast::Expression::FunctionCall {.. } => {
+                                    crate::ast::Expression::FunctionCall { .. } => {
                                         todo!()
                                     }
                                 }
@@ -44,8 +46,7 @@ pub fn generate_assembly(root_node: &AstNode) -> Result<String, String> {
             crate::ast::Statement::ReturnStatement(_expression) => todo!(),
         }
     }
-    #[cfg(target_os = "linux")]
-    {
+    if platform == TargetPlatform::X64Linux {
         result += "\t.section\t.note.GNU-stack,\"\",@progbits\n";
     }
     Ok(result)
