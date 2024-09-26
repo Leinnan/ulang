@@ -40,26 +40,64 @@ const KEYWORDS: [(Token, &str); 3] = [
     (Token::VoidKeyWord, "void"),
 ];
 
-pub fn tokenizer(input: String) -> Vec<Token> {
-    let mut tokens: Vec<Token> = Vec::new();
+#[derive(Debug, Clone, PartialEq)]
+pub struct FileToken {
+    pub token: Token,
+    pub line: usize,
+    pub start_char_in_line: usize,
+}
+
+pub fn tokenizer(input: String) -> Vec<FileToken> {
+    let mut tokens: Vec<FileToken> = Vec::new();
     let mut iter = input.chars().peekable();
+    let mut line_nr = 1;
+    let mut nr_in_line = 0;
 
     while let Some(ch) = iter.next() {
+        nr_in_line += 1;
+        if ch.eq(&'\n') {
+            nr_in_line = 0;
+            line_nr += 1;
+        }
         match ch {
             ch if ch.is_whitespace() => continue,
-            '(' => tokens.push(Token::OpenParenthesis),
-            ')' => tokens.push(Token::CloseParenthesis),
-            '{' => tokens.push(Token::OpenBrace),
-            '}' => tokens.push(Token::CloseBrace),
-            ';' => tokens.push(Token::Semicolon),
+            '(' => tokens.push(FileToken {
+                token: Token::OpenParenthesis,
+                line: line_nr,
+                start_char_in_line: nr_in_line,
+            }),
+            ')' => tokens.push(FileToken {
+                token: Token::CloseParenthesis,
+                line: line_nr,
+                start_char_in_line: nr_in_line,
+            }),
+            '{' => tokens.push(FileToken {
+                token: Token::OpenBrace,
+                line: line_nr,
+                start_char_in_line: nr_in_line,
+            }),
+            '}' => tokens.push(FileToken {
+                token: Token::CloseBrace,
+                line: line_nr,
+                start_char_in_line: nr_in_line,
+            }),
+            ';' => tokens.push(FileToken {
+                token: Token::Semicolon,
+                line: line_nr,
+                start_char_in_line: nr_in_line,
+            }),
             '0'..='9' => {
-                let n: i32 = iter::once(ch)
+                let value = iter::once(ch)
                     .chain(from_fn(|| iter.by_ref().next_if(|s| s.is_ascii_digit())))
-                    .collect::<String>()
-                    .parse()
-                    .unwrap();
+                    .collect::<String>();
+                let n: i32 = value.parse().unwrap();
 
-                tokens.push(Token::Constant(n));
+                tokens.push(FileToken {
+                    line: line_nr,
+                    start_char_in_line: nr_in_line,
+                    token: Token::Constant(n),
+                });
+                nr_in_line += value.len();
                 if let Some(next_ch) = iter.peek() {
                     if next_ch.is_alphabetic() {
                         panic!("FAILED, next char after number {} is {}", &n, next_ch);
@@ -90,12 +128,17 @@ pub fn tokenizer(input: String) -> Vec<Token> {
                     .collect::<String>()
                     .parse()
                     .unwrap();
-
+                let length = n.len();
                 let token = KEYWORDS
                     .iter()
                     .find(|(_, s)| s.eq(&n))
                     .map_or(Token::Identifier(n), |(t, _)| t.clone());
-                tokens.push(token);
+                tokens.push(FileToken {
+                    line: line_nr,
+                    start_char_in_line: nr_in_line,
+                    token,
+                });
+                nr_in_line += length;
             }
             ch => {
                 panic!("unrecognized char: {}", ch);

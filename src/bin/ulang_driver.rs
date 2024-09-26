@@ -57,7 +57,7 @@ fn main() {
         exit(0);
     }
 
-    let mut parser = Parser::new(tokens);
+    let mut parser = Parser::new(tokens.iter().map(|t|t.token.clone()).collect());
     let ast = match parser.parse() {
         Ok(r) => r,
         Err(e) => {
