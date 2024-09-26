@@ -51,13 +51,22 @@ fn main() {
     }
     let tokens =
         ulang::lexer::tokenizer(fs::read_to_string(opt.file).expect("Could not read the file"));
+
+    if tokens.is_err() {
+        for error in tokens.unwrap_err() {
+            eprintln!("{}", error);
+        }
+        exit(1);
+    }
+
+    let tokens = tokens.expect("Failed");
     println!("{:#?}", tokens);
 
     if opt.lex {
         exit(0);
     }
 
-    let mut parser = Parser::new(tokens.iter().map(|t|t.token.clone()).collect());
+    let mut parser = Parser::new(tokens.iter().map(|t| t.token.clone()).collect());
     let ast = match parser.parse() {
         Ok(r) => r,
         Err(e) => {

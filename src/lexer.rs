@@ -2,6 +2,7 @@ use std::{
     fmt::Display,
     iter::{self, from_fn},
 };
+use thiserror::Error;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
@@ -40,6 +41,22 @@ const KEYWORDS: [(Token, &str); 3] = [
     (Token::VoidKeyWord, "void"),
 ];
 
+#[derive(Debug, Error)]
+pub enum LexerError {
+    #[error("[Line {line_nr}:{nr_in_line}] Invalid digit '{ch}' in decimal constant")]
+    InvalidCharInDigitalConstant {
+        line_nr: usize,
+        nr_in_line: usize,
+        ch: char,
+    },
+    #[error("[Line {line_nr}:{nr_in_line}] Unrecognized char '{ch}'")]
+    UnexpectedChar {
+        line_nr: usize,
+        nr_in_line: usize,
+        ch: char,
+    },
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct FileToken {
     pub token: Token,
@@ -47,7 +64,8 @@ pub struct FileToken {
     pub start_char_in_line: usize,
 }
 
-pub fn tokenizer(input: String) -> Vec<FileToken> {
+pub fn tokenizer(input: String) -> Result<Vec<FileToken>, Vec<LexerError>> {
+    let mut errors = Vec::<LexerError>::new();
     let mut tokens: Vec<FileToken> = Vec::new();
     let mut iter = input.chars().peekable();
     let mut line_nr = 1;
@@ -100,7 +118,13 @@ pub fn tokenizer(input: String) -> Vec<FileToken> {
                 nr_in_line += value.len();
                 if let Some(next_ch) = iter.peek() {
                     if next_ch.is_alphabetic() {
-                        panic!("FAILED, next char after number {} is {}", &n, next_ch);
+                        errors.push(LexerError::InvalidCharInDigitalConstant {
+                            line_nr,
+                            nr_in_line,
+                            ch: next_ch.clone(),
+                        });
+                        iter.next();
+                        nr_in_line += 1;
                     }
                 }
             }
@@ -108,16 +132,28 @@ pub fn tokenizer(input: String) -> Vec<FileToken> {
                 if iter.next_if(|s| s.eq(&'/')).is_some() {
                     // Single line comment (//)
                     iter.by_ref().find(|&c| c == '\n'); // Skip until end of the line
+                    nr_in_line = 0;
+                    line_nr += 1;
                 } else if iter.next_if(|s| s.eq(&'*')).is_some() {
+                    nr_in_line += 1;
                     // Multiline comment (/* */)
                     while let Some(ch) = iter.next() {
+                        nr_in_line += 1;
+                        if ch.eq(&'\n') {
+                            nr_in_line = 0;
+                            line_nr += 1;
+                        }
                         if ch == '*' && iter.next_if(|s| s.eq(&'/')).is_some() {
+                            nr_in_line += 1;
                             break; // End of the multiline comment
                         }
                     }
                 } else {
-                    // If it's not part of a comment, you can handle it as an error or another token
-                    panic!("Unexpected '/' character");
+                    errors.push(LexerError::UnexpectedChar {
+                        line_nr,
+                        nr_in_line,
+                        ch: ch.clone(),
+                    });
                 }
             }
             ch if ch.is_ascii_alphabetic() => {
@@ -141,10 +177,18 @@ pub fn tokenizer(input: String) -> Vec<FileToken> {
                 nr_in_line += length;
             }
             ch => {
-                panic!("unrecognized char: {}", ch);
+                errors.push(LexerError::UnexpectedChar {
+                    line_nr,
+                    nr_in_line,
+                    ch: ch.clone(),
+                });
             }
         }
     }
 
-    tokens
+    if errors.is_empty() {
+        Ok(tokens)
+    } else {
+        Err(errors)
+    }
 }
