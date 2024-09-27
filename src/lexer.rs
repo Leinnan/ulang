@@ -1,3 +1,4 @@
+use miette::{Diagnostic, NamedSource, SourceSpan};
 use std::{
     fmt::Display,
     iter::{self, from_fn},
@@ -41,20 +42,23 @@ const KEYWORDS: [(Token, &str); 3] = [
     (Token::VoidKeyWord, "void"),
 ];
 
-#[derive(Debug, Error)]
-pub enum LexerError {
-    #[error("[Line {line_nr}:{nr_in_line}] Invalid digit '{ch}' in decimal constant")]
-    InvalidCharInDigitalConstant {
-        line_nr: usize,
-        nr_in_line: usize,
-        ch: char,
-    },
-    #[error("[Line {line_nr}:{nr_in_line}] Unrecognized char '{ch}'")]
-    UnexpectedChar {
-        line_nr: usize,
-        nr_in_line: usize,
-        ch: char,
-    },
+#[derive(Error, Debug, Diagnostic, Clone)]
+#[error("Failed to parse the code")]
+#[diagnostic(code(error::on::base))]
+pub struct LexerError {
+    #[source_code]
+    src: NamedSource<String>,
+    #[label = "This is the highlight"]
+    span: SourceSpan,
+    pub error: LexerErrorType,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum LexerErrorType {
+    // #[error("[Line {line_nr}:{nr_in_line}] Invalid digit '{ch}' in decimal constant")]
+    InvalidCharInDigitalConstant,
+    // #[error("[Line {line_nr}:{nr_in_line}] Unrecognized char '{ch}'")]
+    UnexpectedChar,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -64,10 +68,11 @@ pub struct FileToken {
     pub start_char_in_line: usize,
 }
 
-pub fn tokenizer(input: String) -> Result<Vec<FileToken>, Vec<LexerError>> {
+pub fn tokenizer(path: std::path::PathBuf) -> Result<Vec<FileToken>, LexerError> {
+    let file = std::fs::read_to_string(path.clone()).expect("Could not read the file");
     let mut errors = Vec::<LexerError>::new();
     let mut tokens: Vec<FileToken> = Vec::new();
-    let mut iter = input.chars().peekable();
+    let mut iter = file.chars().peekable();
     let mut line_nr = 1;
     let mut nr_in_line = 0;
 
@@ -118,10 +123,10 @@ pub fn tokenizer(input: String) -> Result<Vec<FileToken>, Vec<LexerError>> {
                 nr_in_line += value.len();
                 if let Some(next_ch) = iter.peek() {
                     if next_ch.is_alphabetic() {
-                        errors.push(LexerError::InvalidCharInDigitalConstant {
-                            line_nr,
-                            nr_in_line,
-                            ch: next_ch.clone(),
+                        errors.push(LexerError {
+                            src: NamedSource::new(path.to_str().unwrap(), file.clone()),
+                            span: (line_nr, nr_in_line).into(),
+                            error: LexerErrorType::InvalidCharInDigitalConstant,
                         });
                         iter.next();
                         nr_in_line += 1;
@@ -149,10 +154,10 @@ pub fn tokenizer(input: String) -> Result<Vec<FileToken>, Vec<LexerError>> {
                         }
                     }
                 } else {
-                    errors.push(LexerError::UnexpectedChar {
-                        line_nr,
-                        nr_in_line,
-                        ch: ch.clone(),
+                    errors.push(LexerError {
+                        src: NamedSource::new(path.to_str().unwrap(), file.clone()),
+                        span: (line_nr, nr_in_line).into(),
+                        error: LexerErrorType::UnexpectedChar,
                     });
                 }
             }
@@ -176,11 +181,11 @@ pub fn tokenizer(input: String) -> Result<Vec<FileToken>, Vec<LexerError>> {
                 });
                 nr_in_line += length;
             }
-            ch => {
-                errors.push(LexerError::UnexpectedChar {
-                    line_nr,
-                    nr_in_line,
-                    ch: ch.clone(),
+            _ => {
+                errors.push(LexerError {
+                    src: NamedSource::new(path.to_str().unwrap(), file.clone()),
+                    span: (line_nr, nr_in_line).into(),
+                    error: LexerErrorType::UnexpectedChar,
                 });
             }
         }
@@ -189,6 +194,6 @@ pub fn tokenizer(input: String) -> Result<Vec<FileToken>, Vec<LexerError>> {
     if errors.is_empty() {
         Ok(tokens)
     } else {
-        Err(errors)
+        Err(errors.first().unwrap().clone())
     }
 }

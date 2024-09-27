@@ -1,56 +1,70 @@
-use crate::{ast::*, lexer::Token};
+use crate::{
+    ast::*,
+    lexer::{FileToken, Token},
+};
 
 pub struct Parser {
-    tokens: Vec<Token>,
+    tokens: Vec<FileToken>,
     pos: usize,
 }
 
 impl Parser {
-    pub fn new(tokens: Vec<Token>) -> Self {
+    pub fn new(tokens: Vec<FileToken>) -> Self {
         Parser { tokens, pos: 0 }
     }
 
-    pub fn parse(&mut self) -> Result<AstNode, String> {
+    pub fn parse(&mut self) -> Result<AstNode, Vec<String>> {
+        let mut errors = Vec::new();
         let mut nodes = Vec::new();
         while self.pos < self.tokens.len() {
             match self.parse_function() {
                 Ok(fun) => nodes.push(AstNode::FunctionDeclaration(fun)),
-                Err(e) => return Err(format!("Function parsing error: {} instead", e)),
+                Err(e) => {
+                    errors.push(e);
+                    return Err(errors);
+                }
             }
         }
+        if !errors.is_empty() {
+            return Err(errors);
+        }
         if nodes.is_empty() {
-            Err("No valid functions".into())
+            errors.push("No valid functions".into());
+            Err(errors)
         } else {
             Ok(AstNode::Program(nodes))
         }
     }
+
     fn parse_function(&mut self) -> Result<FunctionDecl, String> {
         let return_type = if self.match_token(&Token::IntKeyword) {
             VarType::Int
         } else if self.match_token(&Token::VoidKeyWord) {
             VarType::Void
         } else {
+            let file_token = self.peek().unwrap();
             return Err(format!(
-                "Expected type keyword, found: {} instead",
-                self.peek().unwrap()
+                "[Line {}:{}]Expected Type Keyword, found: {}",
+                file_token.line, file_token.start_char_in_line, file_token.token
             ));
         };
 
-        let name = if let Some(Token::Identifier(name)) = self.advance() {
+        let name = if let Some(Token::Identifier(name)) = self.advance().map(|t| t.token.clone()) {
             name.clone()
         } else {
+            let file_token = self.peek().unwrap();
+
             return Err(format!(
-                "After type {:?} keyword function name is expected, found: {} instead",
-                &return_type,
-                self.peek().unwrap()
+                "[Line {}:{}]After type {:?} keyword function name is expected, found: {} instead",
+                file_token.line, file_token.start_char_in_line, &return_type, file_token.token
             ));
         };
 
         if !self.match_token(&Token::OpenParenthesis) {
+            let file_token = self.peek().unwrap();
             return Err(format!(
-                "After function {} parser expects {{, found: {} instead",
-                &name,
-                self.peek().unwrap()
+                "[Line {}:{}] After function {} parser expects {{, found: {} instead",
+                file_token.line, file_token.start_char_in_line, &name, file_token.token
             ));
         }
 
@@ -63,9 +77,10 @@ impl Parser {
         }
 
         if !self.match_token(&Token::OpenBrace) {
+            let file_token = self.peek().unwrap();
             return Err(format!(
-                "Expected (, found: {} instead",
-                self.peek().unwrap()
+                "[Line {}:{}] Expected (, found: {} instead",
+                file_token.line, file_token.start_char_in_line, file_token.token
             ));
         }
 
@@ -75,9 +90,10 @@ impl Parser {
         };
 
         if !self.match_token(&Token::CloseBrace) {
+            let file_token = self.peek().unwrap();
             return Err(format!(
-                "Expected ), found: {} instead",
-                self.peek().unwrap()
+                "[Line {}:{}] Expected ), found: {} instead",
+                file_token.line, file_token.start_char_in_line, file_token.token
             ));
         }
 
@@ -109,19 +125,21 @@ impl Parser {
         } else if self.match_token(&Token::ReturnKeyWord) {
             return self.parse_return_statement();
         }
+        let file_token = self.peek().unwrap();
         Err(format!(
-            "Expected statement, found {}",
-            self.peek().unwrap()
+            "[Line {}:{}] Expected statement, found {}",
+            file_token.line, file_token.start_char_in_line, file_token.token
         ))
     }
 
     fn parse_variable_declaration(&mut self) -> Result<Statement, String> {
-        let name = if let Some(Token::Identifier(name)) = self.advance() {
+        let name = if let Some(Token::Identifier(name)) = self.advance().map(|t| t.token.clone()) {
             name.clone()
         } else {
+            let file_token = self.peek().unwrap();
             return Err(format!(
-                "Expected variable name, found: {}",
-                self.peek().unwrap()
+                "[Line {}:{}] Expected variable name, found: {}",
+                file_token.line, file_token.start_char_in_line, file_token.token
             ));
         };
 
@@ -131,15 +149,17 @@ impl Parser {
             if self.match_token(&Token::Semicolon) {
                 Some(expression)
             } else {
+                let file_token = self.peek().unwrap();
                 return Err(format!(
-                    "Expected semicolon, found: {}",
-                    self.peek().unwrap()
+                    "[Line {}:{}] Expected semicolon, found: {}",
+                    file_token.line, file_token.start_char_in_line, file_token.token
                 ));
             }
         } else {
+            let file_token = self.peek().unwrap();
             return Err(format!(
-                "Expected Expression, found: {}",
-                self.peek().unwrap()
+                "[Line {}:{}] Expected Expression, found: {}",
+                file_token.line, file_token.start_char_in_line, file_token.token
             ));
         };
 
@@ -165,10 +185,10 @@ impl Parser {
     }
 
     fn parse_expression(&mut self) -> Option<Expression> {
-        if let Some(Token::Constant(value)) = self.advance() {
-            return Some(Expression::Constant(*value));
-        } else if let Some(Token::Identifier(name)) = self.advance() {
-            return Some(Expression::Identifier(name.clone()));
+        if let Some(Token::Constant(value)) = self.advance().map(|t| t.token.clone()) {
+            return Some(Expression::Constant(value));
+        } else if let Some(Token::Identifier(name)) = self.advance().map(|t| t.token.clone()) {
+            return Some(Expression::Identifier(name));
         }
         None
     }
@@ -184,17 +204,17 @@ impl Parser {
 
     fn check_token(&self, token: &Token) -> bool {
         if let Some(current_token) = self.tokens.get(self.pos) {
-            current_token == token
+            &current_token.token == token
         } else {
             false
         }
     }
 
-    fn peek(&self) -> Option<&Token> {
+    fn peek(&self) -> Option<&FileToken> {
         self.tokens.get(self.pos)
     }
 
-    fn advance(&mut self) -> Option<&Token> {
+    fn advance(&mut self) -> Option<&FileToken> {
         if self.pos < self.tokens.len() {
             self.pos += 1;
             self.tokens.get(self.pos - 1)

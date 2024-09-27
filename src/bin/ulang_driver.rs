@@ -1,6 +1,7 @@
 use std::{fs, path::PathBuf, process::exit};
 use structopt::StructOpt;
 use ulang::{code_gen, parser::Parser};
+use miette::{EyreContext, IntoDiagnostic, Result};
 
 /// Simple C lang compiler driver
 #[derive(StructOpt, Debug)]
@@ -36,7 +37,7 @@ impl Opt {
     }
 }
 
-fn main() {
+fn main() -> Result<()> {
     let opt = Opt::from_args();
     if !opt.is_valid() {
         if opt.file.exists() {
@@ -50,27 +51,28 @@ fn main() {
         exit(1);
     }
     let tokens =
-        ulang::lexer::tokenizer(fs::read_to_string(opt.file).expect("Could not read the file"));
+        ulang::lexer::tokenizer(opt.file)?;
 
-    if tokens.is_err() {
-        for error in tokens.unwrap_err() {
-            eprintln!("{}", error);
-        }
-        exit(1);
-    }
+    // if tokens.is_err() {
+    //     use miette::miette;
+    //     for error in tokens.unwrap_err() {
+    //         eprintln!("{}",miette!(error));
+    //     }
+    //     exit(1);
+    // }
 
-    let tokens = tokens.expect("Failed");
+    // let tokens = tokens.expect("Failed");
     println!("{:#?}", tokens);
 
     if opt.lex {
         exit(0);
     }
 
-    let mut parser = Parser::new(tokens.iter().map(|t| t.token.clone()).collect());
+    let mut parser = Parser::new(tokens);
     let ast = match parser.parse() {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("Error during parsing: {}", e);
+            eprintln!("Error during parsing: {:#?}", e);
             exit(2);
         }
     };
@@ -89,4 +91,5 @@ fn main() {
     if opt.codegen {
         exit(0);
     }
+    Ok(())
 }
