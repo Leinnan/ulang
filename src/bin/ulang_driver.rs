@@ -1,7 +1,7 @@
-use std::{fs, path::PathBuf, process::exit};
+use miette::{IntoDiagnostic, Result};
+use std::{path::PathBuf, process::exit};
 use structopt::StructOpt;
 use ulang::{code_gen, parser::Parser};
-use miette::{EyreContext, IntoDiagnostic, Result};
 
 /// Simple C lang compiler driver
 #[derive(StructOpt, Debug)]
@@ -50,8 +50,8 @@ fn main() -> Result<()> {
         }
         exit(1);
     }
-    let tokens =
-        ulang::lexer::tokenizer(opt.file)?;
+    let mut lexer = ulang::lexer::Lexer::from_path(opt.file.clone()).into_diagnostic()?;
+    let tokens = lexer.tokenize()?;
 
     // if tokens.is_err() {
     //     use miette::miette;
@@ -68,14 +68,8 @@ fn main() -> Result<()> {
         exit(0);
     }
 
-    let mut parser = Parser::new(tokens);
-    let ast = match parser.parse() {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("Error during parsing: {:#?}", e);
-            exit(2);
-        }
-    };
+    let mut parser = Parser::new(tokens, lexer.path, lexer.content);
+    let ast = parser.parse()?;
     println!("{:#?}", ast);
 
     if opt.parse {

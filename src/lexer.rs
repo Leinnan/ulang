@@ -1,7 +1,8 @@
-use miette::{Diagnostic, NamedSource, SourceSpan};
+use miette::{Diagnostic, NamedSource, SourceOffset, SourceSpan};
 use std::{
     fmt::Display,
     iter::{self, from_fn},
+    path::PathBuf,
 };
 use thiserror::Error;
 
@@ -19,6 +20,19 @@ pub enum Token {
     Semicolon,
 }
 
+impl Token {
+    fn text_length(&self) -> usize {
+        match self {
+            Token::Identifier(s) => s.len(),
+            Token::Constant(i) => i.to_string().len(),
+            Token::IntKeyword => 3,
+            Token::VoidKeyWord => 4,
+            Token::ReturnKeyWord => 6,
+            _ => 1,
+        }
+    }
+}
+
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -27,10 +41,10 @@ impl Display for Token {
             Token::IntKeyword => f.write_str("int"),
             Token::VoidKeyWord => f.write_str("void"),
             Token::ReturnKeyWord => f.write_str("return"),
-            Token::OpenParenthesis => f.write_str("{"),
-            Token::CloseParenthesis => f.write_str("}"),
-            Token::OpenBrace => f.write_str("("),
-            Token::CloseBrace => f.write_str(")"),
+            Token::OpenParenthesis => f.write_str("("),
+            Token::CloseParenthesis => f.write_str(")"),
+            Token::OpenBrace => f.write_str("{"),
+            Token::CloseBrace => f.write_str("}"),
             Token::Semicolon => f.write_str(";"),
         }
     }
@@ -48,16 +62,16 @@ const KEYWORDS: [(Token, &str); 3] = [
 pub struct LexerError {
     #[source_code]
     src: NamedSource<String>,
-    #[label = "This is the highlight"]
+    #[label = "{error}"]
     span: SourceSpan,
     pub error: LexerErrorType,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Error)]
 pub enum LexerErrorType {
-    // #[error("[Line {line_nr}:{nr_in_line}] Invalid digit '{ch}' in decimal constant")]
+    #[error("Invalid digit in decimal constant")]
     InvalidCharInDigitalConstant,
-    // #[error("[Line {line_nr}:{nr_in_line}] Unrecognized char '{ch}'")]
+    #[error("Unrecognized char")]
     UnexpectedChar,
 }
 
@@ -68,132 +82,163 @@ pub struct FileToken {
     pub start_char_in_line: usize,
 }
 
-pub fn tokenizer(path: std::path::PathBuf) -> Result<Vec<FileToken>, LexerError> {
-    let file = std::fs::read_to_string(path.clone()).expect("Could not read the file");
-    let mut errors = Vec::<LexerError>::new();
-    let mut tokens: Vec<FileToken> = Vec::new();
-    let mut iter = file.chars().peekable();
-    let mut line_nr = 1;
-    let mut nr_in_line = 0;
+impl FileToken {
+    pub fn source_span(&self, source: impl AsRef<str>) -> SourceSpan {
+        SourceSpan::new(
+            SourceOffset::from_location(source, self.line, self.start_char_in_line),
+            self.token.text_length(),
+        )
+    }
+}
 
-    while let Some(ch) = iter.next() {
-        nr_in_line += 1;
-        if ch.eq(&'\n') {
-            nr_in_line = 0;
-            line_nr += 1;
-        }
-        match ch {
-            ch if ch.is_whitespace() => continue,
-            '(' => tokens.push(FileToken {
-                token: Token::OpenParenthesis,
-                line: line_nr,
-                start_char_in_line: nr_in_line,
-            }),
-            ')' => tokens.push(FileToken {
-                token: Token::CloseParenthesis,
-                line: line_nr,
-                start_char_in_line: nr_in_line,
-            }),
-            '{' => tokens.push(FileToken {
-                token: Token::OpenBrace,
-                line: line_nr,
-                start_char_in_line: nr_in_line,
-            }),
-            '}' => tokens.push(FileToken {
-                token: Token::CloseBrace,
-                line: line_nr,
-                start_char_in_line: nr_in_line,
-            }),
-            ';' => tokens.push(FileToken {
-                token: Token::Semicolon,
-                line: line_nr,
-                start_char_in_line: nr_in_line,
-            }),
-            '0'..='9' => {
-                let value = iter::once(ch)
-                    .chain(from_fn(|| iter.by_ref().next_if(|s| s.is_ascii_digit())))
-                    .collect::<String>();
-                let n: i32 = value.parse().unwrap();
+pub struct Lexer {
+    pub path: PathBuf,
+    pub content: String,
+    pub tokens: Vec<FileToken>,
+    line_nr: usize,
+    nr_in_line: usize,
+}
 
-                tokens.push(FileToken {
-                    line: line_nr,
-                    start_char_in_line: nr_in_line,
-                    token: Token::Constant(n),
-                });
-                nr_in_line += value.len();
-                if let Some(next_ch) = iter.peek() {
-                    if next_ch.is_alphabetic() {
-                        errors.push(LexerError {
-                            src: NamedSource::new(path.to_str().unwrap(), file.clone()),
-                            span: (line_nr, nr_in_line).into(),
-                            error: LexerErrorType::InvalidCharInDigitalConstant,
-                        });
-                        iter.next();
-                        nr_in_line += 1;
-                    }
-                }
+impl Lexer {
+    pub fn from_path(path: PathBuf) -> Result<Self, std::io::Error> {
+        let content = std::fs::read_to_string(path.clone())?;
+        Ok(Self {
+            path,
+            content,
+            tokens: Vec::new(),
+            line_nr: 1,
+            nr_in_line: 0,
+        })
+    }
+
+    pub fn tokenize(&mut self) -> Result<Vec<FileToken>, LexerError> {
+        let mut errors = Vec::<LexerError>::new();
+        let mut iter = self.content.chars().peekable();
+        self.line_nr = 1;
+        self.nr_in_line = 0;
+
+        while let Some(ch) = iter.next() {
+            self.nr_in_line += 1;
+            if ch.eq(&'\n') {
+                self.nr_in_line = 0;
+                self.line_nr += 1;
             }
-            '/' => {
-                if iter.next_if(|s| s.eq(&'/')).is_some() {
-                    // Single line comment (//)
-                    iter.by_ref().find(|&c| c == '\n'); // Skip until end of the line
-                    nr_in_line = 0;
-                    line_nr += 1;
-                } else if iter.next_if(|s| s.eq(&'*')).is_some() {
-                    nr_in_line += 1;
-                    // Multiline comment (/* */)
-                    while let Some(ch) = iter.next() {
-                        nr_in_line += 1;
-                        if ch.eq(&'\n') {
-                            nr_in_line = 0;
-                            line_nr += 1;
-                        }
-                        if ch == '*' && iter.next_if(|s| s.eq(&'/')).is_some() {
-                            nr_in_line += 1;
-                            break; // End of the multiline comment
-                        }
-                    }
-                } else {
-                    errors.push(LexerError {
-                        src: NamedSource::new(path.to_str().unwrap(), file.clone()),
-                        span: (line_nr, nr_in_line).into(),
-                        error: LexerErrorType::UnexpectedChar,
+            match ch {
+                ch if ch.is_whitespace() => continue,
+                '(' => self.tokens.push(FileToken {
+                    token: Token::OpenParenthesis,
+                    line: self.line_nr,
+                    start_char_in_line: self.nr_in_line,
+                }),
+                ')' => self.tokens.push(FileToken {
+                    token: Token::CloseParenthesis,
+                    line: self.line_nr,
+                    start_char_in_line: self.nr_in_line,
+                }),
+                '{' => self.tokens.push(FileToken {
+                    token: Token::OpenBrace,
+                    line: self.line_nr,
+                    start_char_in_line: self.nr_in_line,
+                }),
+                '}' => self.tokens.push(FileToken {
+                    token: Token::CloseBrace,
+                    line: self.line_nr,
+                    start_char_in_line: self.nr_in_line,
+                }),
+                ';' => self.tokens.push(FileToken {
+                    token: Token::Semicolon,
+                    line: self.line_nr,
+                    start_char_in_line: self.nr_in_line,
+                }),
+                '0'..='9' => {
+                    let value = iter::once(ch)
+                        .chain(from_fn(|| iter.by_ref().next_if(|s| s.is_ascii_digit())))
+                        .collect::<String>();
+                    let n: i32 = value.parse().unwrap();
+
+                    self.tokens.push(FileToken {
+                        line: self.line_nr,
+                        start_char_in_line: self.nr_in_line,
+                        token: Token::Constant(n),
                     });
+                    self.nr_in_line += value.len();
+                    if let Some(next_ch) = iter.peek() {
+                        if next_ch.is_alphabetic() {
+                            errors.push(self.error(LexerErrorType::InvalidCharInDigitalConstant));
+                            iter.next();
+                            self.nr_in_line += 1;
+                        }
+                    }
+                }
+                '/' => {
+                    if iter.next_if(|s| s.eq(&'/')).is_some() {
+                        // Single line comment (//)
+                        iter.by_ref().find(|&c| c == '\n'); // Skip until end of the line
+                        self.nr_in_line = 0;
+                        self.line_nr += 1;
+                    } else if iter.next_if(|s| s.eq(&'*')).is_some() {
+                        self.nr_in_line += 1;
+                        // Multiline comment (/* */)
+                        while let Some(ch) = iter.next() {
+                            self.nr_in_line += 1;
+                            if ch.eq(&'\n') {
+                                self.nr_in_line = 0;
+                                self.line_nr += 1;
+                            }
+                            if ch == '*' && iter.next_if(|s| s.eq(&'/')).is_some() {
+                                self.nr_in_line += 1;
+                                break; // End of the multiline comment
+                            }
+                        }
+                    } else {
+                        errors.push(self.error(LexerErrorType::UnexpectedChar));
+                    }
+                }
+                ch if ch.is_ascii_alphabetic() => {
+                    let n: String = iter::once(ch)
+                        .chain(from_fn(|| {
+                            iter.by_ref().next_if(|s| s.is_ascii_alphanumeric())
+                        }))
+                        .collect::<String>()
+                        .parse()
+                        .unwrap();
+                    let length = n.len();
+                    let token = KEYWORDS
+                        .iter()
+                        .find(|(_, s)| s.eq(&n))
+                        .map_or(Token::Identifier(n), |(t, _)| t.clone());
+                    self.tokens.push(FileToken {
+                        line: self.line_nr,
+                        start_char_in_line: self.nr_in_line,
+                        token,
+                    });
+                    self.nr_in_line += length;
+                }
+                _ => {
+                    errors.push(self.error(LexerErrorType::UnexpectedChar));
                 }
             }
-            ch if ch.is_ascii_alphabetic() => {
-                let n: String = iter::once(ch)
-                    .chain(from_fn(|| {
-                        iter.by_ref().next_if(|s| s.is_ascii_alphanumeric())
-                    }))
-                    .collect::<String>()
-                    .parse()
-                    .unwrap();
-                let length = n.len();
-                let token = KEYWORDS
-                    .iter()
-                    .find(|(_, s)| s.eq(&n))
-                    .map_or(Token::Identifier(n), |(t, _)| t.clone());
-                tokens.push(FileToken {
-                    line: line_nr,
-                    start_char_in_line: nr_in_line,
-                    token,
-                });
-                nr_in_line += length;
-            }
-            _ => {
-                errors.push(LexerError {
-                    src: NamedSource::new(path.to_str().unwrap(), file.clone()),
-                    span: (line_nr, nr_in_line).into(),
-                    error: LexerErrorType::UnexpectedChar,
-                });
-            }
+        }
+
+        if errors.is_empty() {
+            Ok(self.tokens.clone())
+        } else {
+            Err(errors.first().unwrap().clone())
         }
     }
 
-    if errors.is_empty() {
-        Ok(tokens)
-    } else {
-        Err(errors.first().unwrap().clone())
+    pub fn error(&self, error: LexerErrorType) -> LexerError {
+        LexerError {
+            src: NamedSource::new(self.path.to_str().unwrap(), self.content.clone()),
+            error,
+            span: self.source_span(),
+        }
+    }
+    
+    pub fn source_span(&self) -> SourceSpan {
+        SourceSpan::new(
+            SourceOffset::from_location(&self.content, self.line_nr, self.nr_in_line),
+            1,
+        )
     }
 }
