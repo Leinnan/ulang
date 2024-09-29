@@ -1,26 +1,27 @@
+use clap::Parser;
 use miette::{IntoDiagnostic, Result};
 use std::{path::PathBuf, process::exit};
-use structopt::StructOpt;
-use ulang::{code_gen, parser::Parser};
+use ulang::code_gen;
 
 /// Simple C lang compiler driver
-#[derive(StructOpt, Debug)]
-struct Opt {
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = "Test compiler")]
+#[command(propagate_version = true)]
+struct UlangDriver {
     /// run the lexer, but stop before parsing
-    #[structopt(long)]
+    #[arg(long)]
     lex: bool,
     /// run the lexer and parser, but stop before assembly generation
-    #[structopt(long)]
+    #[arg(long)]
     parse: bool,
     /// perform lexing, parsing and assembly generation, but stop before code emission
-    #[structopt(long)]
+    #[arg(long)]
     codegen: bool,
     /// File to process
-    #[structopt(name = "FILE", parse(from_os_str))]
     file: PathBuf,
 }
 
-impl Opt {
+impl UlangDriver {
     fn is_valid(&self) -> bool {
         let mut counter = 0;
         if self.lex {
@@ -38,7 +39,7 @@ impl Opt {
 }
 
 fn main() -> Result<()> {
-    let opt = Opt::from_args();
+    let opt = UlangDriver::parse();
     if !opt.is_valid() {
         if opt.file.exists() {
             eprintln!(
@@ -68,7 +69,7 @@ fn main() -> Result<()> {
         exit(0);
     }
 
-    let mut parser = Parser::new(tokens, lexer.path, lexer.content);
+    let mut parser = ulang::parser::Parser::new(tokens, lexer.path, lexer.content);
     let ast = parser.parse()?;
     println!("{:#?}", ast);
 
