@@ -61,9 +61,9 @@ const KEYWORDS: [(Token, &str); 3] = [
 #[diagnostic(code(error::on::base))]
 pub struct LexerError {
     #[source_code]
-    src: NamedSource<String>,
+    pub src: NamedSource<String>,
     #[label = "{error}"]
-    span: SourceSpan,
+    pub span: SourceSpan,
     pub error: LexerErrorType,
 }
 

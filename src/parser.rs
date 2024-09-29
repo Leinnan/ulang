@@ -20,9 +20,9 @@ pub struct Parser {
 #[diagnostic(code(error::on::base))]
 pub struct ParserError {
     #[source_code]
-    src: NamedSource<String>,
+    pub src: NamedSource<String>,
     #[label = "{error}"]
-    span: SourceSpan,
+    pub span: SourceSpan,
     pub error: ParserErrorType,
 }
 
