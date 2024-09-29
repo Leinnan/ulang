@@ -100,6 +100,15 @@ pub struct Lexer {
 }
 
 impl Lexer {
+    pub fn from_content(content: String) -> Self {
+        Self {
+            path: "main.c".into(),
+            content,
+            tokens: Vec::new(),
+            line_nr: 1,
+            nr_in_line: 0,
+        }
+    }
     pub fn from_path(path: PathBuf) -> Result<Self, std::io::Error> {
         let content = std::fs::read_to_string(path.clone())?;
         Ok(Self {
@@ -234,7 +243,7 @@ impl Lexer {
             span: self.source_span(),
         }
     }
-    
+
     pub fn source_span(&self) -> SourceSpan {
         SourceSpan::new(
             SourceOffset::from_location(&self.content, self.line_nr, self.nr_in_line),
