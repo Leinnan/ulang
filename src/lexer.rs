@@ -18,6 +18,9 @@ pub enum Token {
     OpenBrace,
     CloseBrace,
     Semicolon,
+    Tilde,
+    Hyphen,
+    Decrement,
 }
 
 impl Token {
@@ -28,6 +31,7 @@ impl Token {
             Token::IntKeyword => 3,
             Token::VoidKeyWord => 4,
             Token::ReturnKeyWord => 6,
+            Token::Decrement => 2,
             _ => 1,
         }
     }
@@ -46,6 +50,9 @@ impl Display for Token {
             Token::OpenBrace => f.write_str("{"),
             Token::CloseBrace => f.write_str("}"),
             Token::Semicolon => f.write_str(";"),
+            Token::Hyphen => f.write_str("-"),
+            Token::Decrement => f.write_str("--"),
+            Token::Tilde => f.write_str("~"),
         }
     }
 }
@@ -159,6 +166,27 @@ impl Lexer {
                     line: self.line_nr,
                     start_char_in_line: self.nr_in_line,
                 }),
+                '~' => self.tokens.push(FileToken {
+                    token: Token::Tilde,
+                    line: self.line_nr,
+                    start_char_in_line: self.nr_in_line,
+                }),
+                '-' => {
+                    if iter.next_if_eq(&'-').is_some() {
+                        self.tokens.push(FileToken {
+                            token: Token::Decrement,
+                            line: self.line_nr,
+                            start_char_in_line: self.nr_in_line,
+                        });
+                        self.nr_in_line += 1;
+                    } else {
+                        self.tokens.push(FileToken {
+                            token: Token::Hyphen,
+                            line: self.line_nr,
+                            start_char_in_line: self.nr_in_line,
+                        });
+                    }
+                }
                 '0'..='9' => {
                     let value = iter::once(ch)
                         .chain(from_fn(|| iter.by_ref().next_if(|s| s.is_ascii_digit())))
