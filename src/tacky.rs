@@ -1,7 +1,4 @@
-use crate::ast::{AstNode, Expression, UnaryOperator};
-
-#[derive(Debug, Clone)]
-pub struct Identifier(pub String);
+use crate::ast::{AstNode, Expression, Identifier, UnaryOperator};
 
 #[derive(Debug, Clone)]
 pub struct TackyProgram(pub FunctionDefinition);
@@ -47,7 +44,7 @@ impl Tacky {
 
     pub fn parse(&mut self) -> Result<TackyProgram, String> {
         let nodes = self.nodes.clone();
-        let Some(AstNode::FunctionDeclaration(function)) = nodes.first().clone() else {
+        let Some(AstNode::FunctionDeclaration(function)) = nodes.first() else {
             return Err("".into());
         };
         self.result = FunctionDefinition {
@@ -57,9 +54,9 @@ impl Tacky {
 
         match &function.body {
             crate::ast::Statement::VariableDeclaration {
-                var_type,
-                name,
-                initializer,
+                var_type: _,
+                name: _,
+                initializer: _,
             } => todo!(),
             crate::ast::Statement::ReturnStatement(expression) => {
                 let result = self.parse_return(expression)?;
@@ -69,15 +66,15 @@ impl Tacky {
                 for el in vec {
                     match el {
                         crate::ast::Statement::VariableDeclaration {
-                            var_type,
-                            name,
-                            initializer,
+                            var_type: _,
+                            name: _,
+                            initializer: _,
                         } => todo!(),
                         crate::ast::Statement::ReturnStatement(expression) => {
                             let result = self.parse_return(expression)?;
                             self.result.instruction.extend(result);
                         }
-                        crate::ast::Statement::Compound(vec) => todo!(),
+                        crate::ast::Statement::Compound(_) => todo!(),
                     }
                 }
             }
@@ -96,7 +93,7 @@ impl Tacky {
         let mut instructions = vec![];
         match return_val {
             Expression::Constant(c) => {
-                instructions.push(Instruction::Return(Value::Constant(c.clone())))
+                instructions.push(Instruction::Return(Value::Constant(*c)))
             }
             Expression::Unary(unary_operator, expression) => {
                 let id = self.get_tmp_var();
@@ -123,7 +120,7 @@ impl Tacky {
         match expression {
             Expression::Constant(c) => instructions.push(Instruction::Unary {
                 operator: unary_operator.clone(),
-                src: Value::Constant(c.clone()),
+                src: Value::Constant(*c),
                 dest: Value::Var(dst_name.clone()),
             }),
             Expression::Unary(inner_operator, inner_expression) => {

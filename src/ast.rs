@@ -1,5 +1,8 @@
 use crate::lexer::Token;
 
+#[derive(Debug, Clone, Hash, PartialEq, PartialOrd, Ord, Eq)]
+pub struct Identifier(pub String);
+
 #[derive(Debug, Clone)]
 pub enum AstNode {
     // Represents an expression, such as a variable, constant, or function call

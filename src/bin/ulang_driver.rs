@@ -1,7 +1,7 @@
 use clap::Parser;
 use miette::{IntoDiagnostic, Result};
 use std::{path::PathBuf, process::exit};
-use ulang::code_gen;
+use ulang::assembly;
 
 /// Simple C lang compiler driver
 #[derive(Parser, Debug)]
@@ -90,17 +90,22 @@ fn main() -> Result<()> {
         exit(0);
     }
 
+    let asm_ast: ulang::assembly::AsmProgram = (&result).into();
+    println!("ASM AST: {:#?}", asm_ast);
+
+    let asm_replaced: ulang::assembly::AsmProgramWithReplacedPseudoRegisters = asm_ast.into();
+    println!("ASM Replaced: {:#?}", asm_replaced);
+
+    let asm_fixed: ulang::assembly::AsmProgramWithFixedInstructions = asm_replaced.into();
+    println!("ASM Fixed: {:#?}", asm_fixed);
+
     #[cfg(target_os = "linux")]
-    let assembly = code_gen::generate_assembly(&ast, code_gen::TargetPlatform::X64Linux);
+    let target = assembly::TargetPlatform::X64Linux;
     #[cfg(not(target_os = "linux"))]
-    let assembly = code_gen::generate_assembly(&ast, code_gen::TargetPlatform::MacOsX64);
-    match &assembly {
-        Ok(result) => println!("{}", result),
-        Err(e) => {
-            eprintln!("{}", e);
-            exit(1);
-        }
-    }
+    let target = assembly::TargetPlatform::MacOsX64;
+
+    let asm_final = asm_fixed.generate(target);
+    println!("{}", asm_final.0);
 
     if opt.codegen {
         exit(0);
