@@ -81,7 +81,13 @@ fn main() -> Result<()> {
     let assembly = code_gen::generate_assembly(&ast, code_gen::TargetPlatform::X64Linux);
     #[cfg(not(target_os = "linux"))]
     let assembly = code_gen::generate_assembly(&ast, code_gen::TargetPlatform::MacOsX64);
-    println!("{}", assembly.expect("Failed to generate ASM"));
+    match &assembly {
+        Ok(result) => println!("{}", result),
+        Err(e) => {
+            eprintln!("{}", e);
+            exit(1);
+        }
+    }
 
     if opt.codegen {
         exit(0);
