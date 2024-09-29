@@ -42,6 +42,8 @@ pub enum ParserErrorType {
     ExpectedVariableName,
     #[error("Expected expression")]
     ExpectedExpression,
+    #[error("Missing return value")]
+    MissingReturnValue,
 }
 
 impl Parser {
@@ -195,7 +197,14 @@ impl Parser {
         };
 
         if self.match_token(&Token::Semicolon) {
-            Ok(Statement::ReturnStatement(expr))
+            if expr.is_some() {
+                Ok(Statement::ReturnStatement(expr))
+            } else {
+                Err(self.error(
+                    self.previous().unwrap().clone(),
+                    ParserErrorType::MissingReturnValue,
+                ))
+            }
         } else {
             Err(self.error(
                 self.peek().unwrap().clone(),
@@ -204,12 +213,38 @@ impl Parser {
         }
     }
 
+    // TODO replace Option with result type
     fn parse_expression(&mut self) -> Option<Expression> {
-        if let Some(Token::Constant(value)) = self.advance().map(|t| t.token.clone()) {
-            return Some(Expression::Constant(value));
-        } else if let Some(Token::Identifier(name)) = self.advance().map(|t| t.token.clone()) {
-            return Some(Expression::Identifier(name));
+        let token = self.peek().map(|t| t.token.clone())?;
+        match token {
+            Token::Constant(value) => {
+                self.pos += 1;
+                return Some(Expression::Constant(value));
+            }
+            Token::Identifier(name) => {
+                self.pos += 1;
+                return Some(Expression::Identifier(name));
+            }
+            Token::OpenParenthesis => {
+                self.pos += 1;
+                let expression = self.parse_expression();
+                let token = self.advance().map(|t| t.token.clone())?;
+                if token == Token::CloseParenthesis {
+                    return expression;
+                } else {
+                    return None;
+                }
+            }
+            _ => (),
         }
+
+        if let Some(operator) = UnaryOperator::from_token(&token) {
+            self.pos += 1;
+            return self
+                .parse_expression()
+                .map(|e| Expression::Unary(operator, Box::new(e)));
+        };
+
         None
     }
 
@@ -232,6 +267,9 @@ impl Parser {
 
     fn peek(&self) -> Option<&FileToken> {
         self.tokens.get(self.pos)
+    }
+    fn previous(&self) -> Option<&FileToken> {
+        self.tokens.get(self.pos - 1)
     }
 
     fn advance(&mut self) -> Option<&FileToken> {

@@ -35,6 +35,7 @@ pub fn generate_assembly(root_node: &AstNode, platform: TargetPlatform) -> Resul
                                     crate::ast::Expression::FunctionCall { .. } => {
                                         todo!()
                                     }
+                                    crate::ast::Expression::Unary(_, _) => todo!(),
                                 }
                                 result += "\tret\n";
                             }

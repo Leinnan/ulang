@@ -1,3 +1,5 @@
+use crate::lexer::Token;
+
 #[derive(Debug, Clone)]
 pub enum AstNode {
     // Represents an expression, such as a variable, constant, or function call
@@ -14,9 +16,26 @@ pub enum AstNode {
 }
 
 #[derive(Debug, Clone)]
+pub enum UnaryOperator {
+    Complement,
+    Negate,
+}
+
+impl UnaryOperator {
+    pub fn from_token(token: &Token) -> Option<Self> {
+        match token {
+            Token::Hyphen => Some(UnaryOperator::Negate),
+            Token::Tilde => Some(UnaryOperator::Complement),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum Expression {
     // A constant integer
     Constant(i32),
+    Unary(UnaryOperator, Box<Expression>),
 
     // An identifier (variable or function name)
     Identifier(String),
