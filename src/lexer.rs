@@ -21,6 +21,10 @@ pub enum Token {
     Tilde,
     Hyphen,
     Decrement,
+    Plus,
+    Asteriks,
+    Slash,
+    PercentSign,
 }
 
 impl Token {
@@ -53,6 +57,10 @@ impl Display for Token {
             Token::Hyphen => f.write_str("-"),
             Token::Decrement => f.write_str("--"),
             Token::Tilde => f.write_str("~"),
+            Token::Plus => f.write_str("+"),
+            Token::Asteriks => f.write_str("*"),
+            Token::Slash => f.write_str("/"),
+            Token::PercentSign => f.write_str("%"),
         }
     }
 }
@@ -126,10 +134,18 @@ impl Lexer {
             nr_in_line: 0,
         })
     }
+    pub fn add_token(&mut self, token: Token) {
+        self.tokens.push(FileToken {
+            token,
+            line: self.line_nr,
+            start_char_in_line: self.nr_in_line,
+        })
+    }
 
     pub fn tokenize(&mut self) -> Result<Vec<FileToken>, LexerError> {
         let mut errors = Vec::<LexerError>::new();
-        let mut iter = self.content.chars().peekable();
+        let content = self.content.clone();
+        let mut iter = content.chars().peekable();
         self.line_nr = 1;
         self.nr_in_line = 0;
 
@@ -141,50 +157,21 @@ impl Lexer {
             }
             match ch {
                 ch if ch.is_whitespace() => continue,
-                '(' => self.tokens.push(FileToken {
-                    token: Token::OpenParenthesis,
-                    line: self.line_nr,
-                    start_char_in_line: self.nr_in_line,
-                }),
-                ')' => self.tokens.push(FileToken {
-                    token: Token::CloseParenthesis,
-                    line: self.line_nr,
-                    start_char_in_line: self.nr_in_line,
-                }),
-                '{' => self.tokens.push(FileToken {
-                    token: Token::OpenBrace,
-                    line: self.line_nr,
-                    start_char_in_line: self.nr_in_line,
-                }),
-                '}' => self.tokens.push(FileToken {
-                    token: Token::CloseBrace,
-                    line: self.line_nr,
-                    start_char_in_line: self.nr_in_line,
-                }),
-                ';' => self.tokens.push(FileToken {
-                    token: Token::Semicolon,
-                    line: self.line_nr,
-                    start_char_in_line: self.nr_in_line,
-                }),
-                '~' => self.tokens.push(FileToken {
-                    token: Token::Tilde,
-                    line: self.line_nr,
-                    start_char_in_line: self.nr_in_line,
-                }),
+                '(' => self.add_token(Token::OpenParenthesis),
+                ')' => self.add_token(Token::CloseParenthesis),
+                '{' => self.add_token(Token::OpenBrace),
+                '}' => self.add_token(Token::CloseBrace),
+                ';' => self.add_token(Token::Semicolon),
+                '~' => self.add_token(Token::Tilde),
+                '+' => self.add_token(Token::Plus),
+                '*' => self.add_token(Token::Asteriks),
+                '%' => self.add_token(Token::PercentSign),
                 '-' => {
                     if iter.next_if_eq(&'-').is_some() {
-                        self.tokens.push(FileToken {
-                            token: Token::Decrement,
-                            line: self.line_nr,
-                            start_char_in_line: self.nr_in_line,
-                        });
+                        self.add_token(Token::Decrement);
                         self.nr_in_line += 1;
                     } else {
-                        self.tokens.push(FileToken {
-                            token: Token::Hyphen,
-                            line: self.line_nr,
-                            start_char_in_line: self.nr_in_line,
-                        });
+                        self.add_token(Token::Hyphen);
                     }
                 }
                 '0'..='9' => {
@@ -193,11 +180,7 @@ impl Lexer {
                         .collect::<String>();
                     let n: i32 = value.parse().unwrap();
 
-                    self.tokens.push(FileToken {
-                        line: self.line_nr,
-                        start_char_in_line: self.nr_in_line,
-                        token: Token::Constant(n),
-                    });
+                    self.add_token(Token::Constant(n));
                     self.nr_in_line += value.len();
                     if let Some(next_ch) = iter.peek() {
                         if next_ch.is_alphabetic() {
@@ -228,7 +211,7 @@ impl Lexer {
                             }
                         }
                     } else {
-                        errors.push(self.error(LexerErrorType::UnexpectedChar));
+                        self.add_token(Token::Slash);
                     }
                 }
                 ch if ch.is_ascii_alphabetic() => {
