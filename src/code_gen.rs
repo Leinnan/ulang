@@ -24,8 +24,13 @@ pub fn generate_assembly(root_node: &AstNode, platform: TargetPlatform) -> Resul
             AstNode::FunctionDeclaration(decl) => decl,
             o => return Err(format!("Expected function declaration, found: {:?}", o)),
         };
-        result += &format!("\t.globl {}\n", function_decl.name);
-        result += &format!(".{}\n", function_decl.name);
+        if platform == TargetPlatform::MacOsX64 {
+            result += &format!("\t.globl _{}\n", function_decl.name);
+            result += &format!("._{}\n", function_decl.name);
+        } else {
+            result += &format!("\t.globl {}\n", function_decl.name);
+            result += &format!(".{}\n", function_decl.name);
+        }
         match &function_decl.body {
             crate::ast::Statement::VariableDeclaration { .. } => {
                 return Err(not_supported_error(&function_decl.body))
