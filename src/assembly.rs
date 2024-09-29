@@ -197,14 +197,12 @@ impl From<AsmProgram> for AsmProgramWithReplacedPseudoRegisters {
                         dst: dst_new,
                     });
                 }
-                AsmInstruction::Unary(asm_unary_operator, operand) => {
-                    if let Operand::Pseudo(id) = operand {
-                        let val = hasher.get(id);
-                        new_instruction = Some(AsmInstruction::Unary(
-                            asm_unary_operator.clone(),
-                            Operand::Stack(val),
-                        ));
-                    }
+                AsmInstruction::Unary(asm_unary_operator, Operand::Pseudo(id)) => {
+                    let val = hasher.get(id);
+                    new_instruction = Some(AsmInstruction::Unary(
+                        asm_unary_operator.clone(),
+                        Operand::Stack(val),
+                    ));
                 }
                 _ => {}
             }

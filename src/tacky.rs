@@ -92,9 +92,7 @@ impl Tacky {
         };
         let mut instructions = vec![];
         match return_val {
-            Expression::Constant(c) => {
-                instructions.push(Instruction::Return(Value::Constant(*c)))
-            }
+            Expression::Constant(c) => instructions.push(Instruction::Return(Value::Constant(*c))),
             Expression::Unary(unary_operator, expression) => {
                 let id = self.get_tmp_var();
                 let instructions_unary =
