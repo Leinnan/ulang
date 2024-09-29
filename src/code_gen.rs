@@ -1,4 +1,4 @@
-use crate::ast::{AstNode, Statement};
+use crate::{ast::Statement, tacky::TackyProgram};
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum TargetPlatform {
@@ -13,64 +13,69 @@ pub fn not_supported_error(node: &Statement) -> String {
     )
 }
 
-pub fn generate_assembly(root_node: &AstNode, platform: TargetPlatform) -> Result<String, String> {
+pub fn generate_assembly(
+    program: &TackyProgram,
+    platform: TargetPlatform,
+) -> Result<String, String> {
     let mut result = String::with_capacity(500);
-    let program = match root_node {
-        AstNode::Program(fun) => fun,
-        _ => return Err("Root node should be Program".into()),
-    };
-    for function in program {
-        let function_decl = match function {
-            AstNode::FunctionDeclaration(decl) => decl,
-            o => return Err(format!("Expected function declaration, found: {:?}", o)),
-        };
-        if platform == TargetPlatform::MacOsX64 {
-            result += &format!("\t.globl _{}\n", function_decl.name);
-            result += &format!("._{}\n", function_decl.name);
-        } else {
-            result += &format!("\t.globl {}\n", function_decl.name);
-            result += &format!(".{}\n", function_decl.name);
-        }
-        match &function_decl.body {
-            crate::ast::Statement::VariableDeclaration { .. } => {
-                return Err(not_supported_error(&function_decl.body))
-            }
-            crate::ast::Statement::Compound(vec) => {
-                for st in vec {
-                    match st {
-                        crate::ast::Statement::VariableDeclaration { .. } => {
-                            return Err(not_supported_error(&function_decl.body))
-                        }
-                        crate::ast::Statement::ReturnStatement(expression) => {
-                            if let Some(e) = expression {
-                                match e {
-                                    crate::ast::Expression::Constant(constant) => {
-                                        result += &format!("\tmovl\t${}, %eax\n", constant);
-                                    }
-                                    crate::ast::Expression::Identifier(_) => {
-                                        return Err(not_supported_error(&function_decl.body))
-                                    }
-                                    crate::ast::Expression::FunctionCall { .. } => {
-                                        return Err(not_supported_error(&function_decl.body))
-                                    }
-                                    crate::ast::Expression::Unary(_, _) => {
-                                        return Err(not_supported_error(&function_decl.body))
-                                    }
-                                }
-                                result += "\tret\n";
-                            }
-                        }
-                        crate::ast::Statement::Compound(_vec) => {
-                            return Err(not_supported_error(&function_decl.body))
-                        }
-                    }
-                }
-            }
-            crate::ast::Statement::ReturnStatement(_expression) => {
-                return Err(not_supported_error(&function_decl.body))
-            }
+    let function_def = &program.0;
+    if platform == TargetPlatform::MacOsX64 {
+        result += &format!("\t.globl _{}\n", function_def.identifier);
+        result += &format!("._{}\n", function_def.identifier);
+    } else {
+        result += &format!("\t.globl {}\n", function_def.identifier);
+        result += &format!(".{}\n", function_def.identifier);
+    }
+    for instruction in &function_def.instruction {
+        match instruction {
+            crate::tacky::Instruction::Return(value) => result += &format!("mov "),
+            crate::tacky::Instruction::Unary {
+                operator,
+                src,
+                dest,
+            } => todo!(),
         }
     }
+    // match &function_decl.body {
+    //     crate::ast::Statement::VariableDeclaration { .. } => {
+    //         return Err(not_supported_error(&function_decl.body))
+    //     }
+    //     crate::ast::Statement::Compound(vec) => {
+    //         for st in vec {
+    //             match st {
+    //                 crate::ast::Statement::VariableDeclaration { .. } => {
+    //                     return Err(not_supported_error(&function_decl.body))
+    //                 }
+    //                 crate::ast::Statement::ReturnStatement(expression) => {
+    //                     if let Some(e) = expression {
+    //                         match e {
+    //                             crate::ast::Expression::Constant(constant) => {
+    //                                 result += &format!("\tmovl\t${}, %eax\n", constant);
+    //                             }
+    //                             // crate::ast::Expression::Identifier(_) => {
+    //                             //     return Err(not_supported_error(&function_decl.body))
+    //                             // }
+    //                             // crate::ast::Expression::FunctionCall { .. } => {
+    //                             //     return Err(not_supported_error(&function_decl.body))
+    //                             // }
+    //                             crate::ast::Expression::Unary(_, _) => {
+    //                                 return Err(not_supported_error(&function_decl.body))
+    //                             }
+    //                         }
+    //                         result += "\tret\n";
+    //                     }
+    //                 }
+    //                 crate::ast::Statement::Compound(_vec) => {
+    //                     return Err(not_supported_error(&function_decl.body))
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     crate::ast::Statement::ReturnStatement(_expression) => {
+    //         return Err(not_supported_error(&function_decl.body))
+    //     }
+    // }
+
     if platform == TargetPlatform::X64Linux {
         result += "\t.section\t.note.GNU-stack,\"\",@progbits\n";
     }

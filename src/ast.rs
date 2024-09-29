@@ -36,15 +36,14 @@ pub enum Expression {
     // A constant integer
     Constant(i32),
     Unary(UnaryOperator, Box<Expression>),
-
     // An identifier (variable or function name)
-    Identifier(String),
+    // Identifier(String),
 
-    // A function call with a name and arguments
-    FunctionCall {
-        name: String,
-        arguments: Vec<Expression>,
-    },
+    // // A function call with a name and arguments
+    // FunctionCall {
+    //     name: String,
+    //     arguments: Vec<Expression>,
+    // },
 }
 #[derive(Debug, Clone)]
 pub enum Statement {

@@ -221,10 +221,10 @@ impl Parser {
                 self.pos += 1;
                 return Some(Expression::Constant(value));
             }
-            Token::Identifier(name) => {
-                self.pos += 1;
-                return Some(Expression::Identifier(name));
-            }
+            // Token::Identifier(name) => {
+            //     self.pos += 1;
+            //     return Some(Expression::Identifier(name));
+            // }
             Token::OpenParenthesis => {
                 self.pos += 1;
                 let expression = self.parse_expression();

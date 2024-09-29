@@ -17,6 +17,9 @@ struct UlangDriver {
     /// perform lexing, parsing and assembly generation, but stop before code emission
     #[arg(long)]
     codegen: bool,
+    /// perform lexing, parsing and tacky generation, but stop before code assembly
+    #[arg(long)]
+    tacky: bool,
     /// File to process
     file: PathBuf,
 }
@@ -31,6 +34,9 @@ impl UlangDriver {
             counter += 1;
         }
         if self.codegen {
+            counter += 1;
+        }
+        if self.tacky {
             counter += 1;
         }
 
@@ -74,6 +80,13 @@ fn main() -> Result<()> {
     println!("{:#?}", ast);
 
     if opt.parse {
+        exit(0);
+    }
+
+    let mut tacky = ulang::tacky::Tacky::from_program_node(&ast).unwrap();
+    let result = tacky.parse().unwrap();
+    println!("\nTacky\n{:#?}", result);
+    if opt.tacky {
         exit(0);
     }
 
