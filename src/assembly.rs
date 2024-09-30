@@ -113,6 +113,12 @@ impl From<&TackyProgram> for AsmProgram {
         };
         for instruction in &tacky_function.instruction {
             match instruction {
+                crate::tacky::Instruction::Binary {
+                    operator,
+                    src1,
+                    src2,
+                    dest,
+                } => todo!(),
                 crate::tacky::Instruction::Return(value) => {
                     function_def.instructions.push(AsmInstruction::Mov {
                         src: value.into(),
