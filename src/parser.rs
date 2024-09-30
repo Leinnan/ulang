@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{clone, path::PathBuf};
 
 use miette::{Diagnostic, NamedSource, SourceSpan};
 use thiserror::Error;
@@ -21,9 +21,10 @@ pub struct Parser {
 pub struct ParserError {
     #[source_code]
     pub src: NamedSource<String>,
-    #[label = "{error}"]
+    #[label = "{error}, found {token}"]
     pub span: SourceSpan,
     pub error: ParserErrorType,
+    pub token: Token,
 }
 
 #[derive(Debug, Clone, Copy, Error)]
@@ -61,6 +62,7 @@ impl Parser {
             src: NamedSource::new(self.file_name.to_str().unwrap(), self.file.clone()),
             error,
             span: token.source_span(&self.file),
+            token: token.token.clone(),
         }
     }
 
@@ -170,11 +172,11 @@ impl Parser {
 
         let initializer = if self.match_token(&Token::Semicolon) {
             None
-        } else if let Some(expression) = self.parse_expression() {
+        } else if let Ok(expression) = self.parse_expression() {
             if self.match_token(&Token::Semicolon) {
                 Some(expression)
             } else {
-                let file_token = self.peek().unwrap();
+                let file_token = self.previous().unwrap();
                 return Err(self.error(file_token.clone(), ParserErrorType::ExpectedChar(';')));
             }
         } else {
@@ -193,59 +195,94 @@ impl Parser {
         let expr = if !self.check_token(&Token::Semicolon) {
             self.parse_expression()
         } else {
-            None
+            Err("TT".into())
         };
 
-        if self.match_token(&Token::Semicolon) {
-            if expr.is_some() {
-                Ok(Statement::ReturnStatement(expr))
-            } else {
-                Err(self.error(
-                    self.previous().unwrap().clone(),
-                    ParserErrorType::MissingReturnValue,
-                ))
-            }
+        println!("{:?}", expr);
+        if expr.is_ok() && self.check_token(&Token::Semicolon) {
+            self.advance();
+            Ok(Statement::ReturnStatement(Some(expr.expect("msg"))))
         } else {
+            println!("{}", expr.unwrap_err());
             Err(self.error(
                 self.peek().unwrap().clone(),
-                ParserErrorType::ExpectedChar(';'),
+                ParserErrorType::MissingReturnValue,
             ))
         }
     }
 
-    // TODO replace Option with result type
-    fn parse_expression(&mut self) -> Option<Expression> {
-        let token = self.peek().map(|t| t.token.clone())?;
-        match token {
-            Token::Constant(value) => {
-                self.pos += 1;
-                return Some(Expression::Constant(value));
+    /// Entry point for parsing expressions, with initial minimum precedence 0.
+    pub fn parse_expression(&mut self) -> Result<Expression, String> {
+        self.parse_binary_expression(0)
+    }
+
+    pub fn parse_binary_expression(&mut self, min_precedence: i32) -> Result<Expression, String> {
+        let mut left = self.parse_factor()?;
+        println!("{:?}", left);
+        loop {
+            let Some(operator) = self.peek_binary_operator() else {
+                return Ok(left);
+            };
+            let precedence = operator.precedence();
+            if min_precedence > precedence {
+                return Ok(left);
             }
-            // Token::Identifier(name) => {
-            //     self.pos += 1;
-            //     return Some(Expression::Identifier(name));
-            // }
-            Token::OpenParenthesis => {
-                self.pos += 1;
-                let expression = self.parse_expression();
-                let token = self.advance().map(|t| t.token.clone())?;
-                if token == Token::CloseParenthesis {
-                    return expression;
-                } else {
-                    return None;
+            self.advance();
+            let right = self.parse_binary_expression(min_precedence + 1)?;
+            left = Expression::Binary(Box::new(left), operator, Box::new(right))
+        }
+    }
+
+    pub fn parse_factor(&mut self) -> Result<Expression, String> {
+        let Some(token) = self.peek() else {
+            return Err("".into());
+        };
+        match token.token {
+            Token::Constant(c) => {
+                self.advance();
+                return Ok(Expression::Factor(Factor::Constant(c.clone())));
+            }
+            Token::Hyphen | Token::Tilde => {
+                let operator = UnaryOperator::from_token(&token.token).unwrap();
+                self.advance();
+                let inner = self.parse_factor();
+                match inner {
+                    Ok(i) => {
+                        return Ok(Expression::Factor(Factor::Unary(
+                            operator,
+                            Box::new(i.clone()),
+                        )))
+                    }
+                    Err(e) => return Err(e),
                 }
             }
-            _ => (),
-        }
-
-        if let Some(operator) = UnaryOperator::from_token(&token) {
-            self.pos += 1;
-            return self
-                .parse_expression()
-                .map(|e| Expression::Unary(operator, Box::new(e)));
+            Token::OpenParenthesis => {
+                self.advance();
+                let inner = self
+                    .parse_expression()
+                    .map(|i| Expression::Factor(Factor::ParentedExpression(Box::new(i))));
+                if self.check_token(&Token::CloseParenthesis) {
+                    return inner;
+                } else {
+                    return Err("".into());
+                    // return Err(self.error(self.peek().unwrap().clone(), ParserErrorType::ExpectedChar('})))
+                }
+            }
+            _ => {}
         };
+        Err("".into())
+    }
 
-        None
+    /// Peek to see if the next token is a unary operator
+    fn peek_unary_operator(&self) -> Option<UnaryOperator> {
+        self.peek()
+            .and_then(|file_token| UnaryOperator::from_token(&file_token.token))
+    }
+
+    /// Peek to see if the next token is a binary operator
+    fn peek_binary_operator(&self) -> Option<BinaryOperator> {
+        self.peek()
+            .and_then(|file_token| BinaryOperator::try_from(file_token.token.clone()).ok())
     }
 
     fn match_token(&mut self, token: &Token) -> bool {

@@ -35,10 +35,47 @@ impl UnaryOperator {
 }
 
 #[derive(Debug, Clone)]
+pub enum BinaryOperator {
+    Add,
+    Substract,
+    Multiply,
+    Divide,
+    Remainder,
+}
+
+impl BinaryOperator {
+    pub fn precedence(&self) -> i32 {
+        match self {
+            BinaryOperator::Add => 45,
+            BinaryOperator::Substract => 45,
+            BinaryOperator::Multiply => 50,
+            BinaryOperator::Divide => 50,
+            BinaryOperator::Remainder => 50,
+        }
+    }
+}
+
+impl TryFrom<Token> for BinaryOperator {
+    type Error = ();
+
+    fn try_from(value: Token) -> Result<Self, Self::Error> {
+        match value {
+            Token::Plus => Ok(BinaryOperator::Add),
+            Token::Slash => Ok(BinaryOperator::Divide),
+            Token::Hyphen => Ok(BinaryOperator::Substract),
+            Token::PercentSign => Ok(BinaryOperator::Remainder),
+            Token::Asteriks => Ok(BinaryOperator::Multiply),
+            _ => Err(()),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum Expression {
-    // A constant integer
-    Constant(i32),
-    Unary(UnaryOperator, Box<Expression>),
+    Factor(Factor),
+    // Constant(i32),
+    // Unary(UnaryOperator, Box<Expression>),
+    Binary(Box<Expression>, BinaryOperator, Box<Expression>),
     // An identifier (variable or function name)
     // Identifier(String),
 
@@ -47,6 +84,13 @@ pub enum Expression {
     //     name: String,
     //     arguments: Vec<Expression>,
     // },
+}
+
+#[derive(Debug, Clone)]
+pub enum Factor {
+    Constant(i32),
+    Unary(UnaryOperator, Box<Expression>),
+    ParentedExpression(Box<Expression>),
 }
 #[derive(Debug, Clone)]
 pub enum Statement {

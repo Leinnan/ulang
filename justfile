@@ -12,6 +12,6 @@ preprocess:
     gcc -E -P samples/return_2.c -o return_2.i
 
 all_files:
-    for filename in `ls ../writing-a-c-compiler-tests/tests/chapter_2/valid`; do \
-      cargo run --release --features="build-binary" --  ../writing-a-c-compiler-tests/tests/chapter_2/valid/$filename; \
+    for filename in `ls ../writing-a-c-compiler-tests/tests/chapter_3/valid`; do \
+      cargo run --release --features="build-binary" --  ../writing-a-c-compiler-tests/tests/chapter_3/valid/$filename; \
     done

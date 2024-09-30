@@ -92,18 +92,28 @@ impl Tacky {
         };
         let mut instructions = vec![];
         match return_val {
-            Expression::Constant(c) => instructions.push(Instruction::Return(Value::Constant(*c))),
-            Expression::Unary(unary_operator, expression) => {
-                let id = self.get_tmp_var();
-                let instructions_unary =
-                    match self.parse_unary(unary_operator, expression, id.clone()) {
-                        Ok(ins) => ins,
-                        Err(e) => return Err(e),
-                    };
-                instructions.extend(instructions_unary);
-                instructions.push(Instruction::Return(Value::Var(id)));
-            } // Expression::Identifier(_) => todo!(),
-              // Expression::FunctionCall { name, arguments } => todo!(),
+            Expression::Binary(binary_operator, expression, expression1) => todo!(),
+            Expression::Factor(factor) => match factor {
+                crate::ast::Factor::Constant(c) => {
+                    instructions.push(Instruction::Return(Value::Constant(*c)))
+                }
+                crate::ast::Factor::Unary(unary_operator, expression) => {
+                    let id = self.get_tmp_var();
+                    let instructions_unary =
+                        match self.parse_unary(unary_operator, expression, id.clone()) {
+                            Ok(ins) => ins,
+                            Err(e) => return Err(e),
+                        };
+                    instructions.extend(instructions_unary);
+                    instructions.push(Instruction::Return(Value::Var(id)));
+                }
+                crate::ast::Factor::Unary(unary_operator, _) => todo!(),
+                crate::ast::Factor::ParentedExpression(e) => {
+                    let mut result = self.parse_return(&Some(*e.clone()))?;
+                    instructions.append(&mut result);
+                }
+            }, // Expression::Identifier(_) => todo!(),
+               // Expression::FunctionCall { name, arguments } => todo!(),
         }
         Ok(instructions)
     }
@@ -116,24 +126,30 @@ impl Tacky {
     ) -> Result<Vec<Instruction>, String> {
         let mut instructions = vec![];
         match expression {
-            Expression::Constant(c) => instructions.push(Instruction::Unary {
-                operator: unary_operator.clone(),
-                src: Value::Constant(*c),
-                dest: Value::Var(dst_name.clone()),
-            }),
-            Expression::Unary(inner_operator, inner_expression) => {
-                // Recur on the inner unary expression
-                let temp_var = self.get_tmp_var(); // You may need to define how you generate temp identifiers
-                let inner_instructions =
-                    self.parse_unary(inner_operator, inner_expression, temp_var.clone())?;
-                instructions.extend(inner_instructions);
+            Expression::Binary(binary_operator, expression, expression1) => todo!(),
+            Expression::Factor(factor) => {
+                match factor {
+                    crate::ast::Factor::Constant(c) => instructions.push(Instruction::Unary {
+                        operator: unary_operator.clone(),
+                        src: Value::Constant(*c),
+                        dest: Value::Var(dst_name.clone()),
+                    }),
+                    crate::ast::Factor::Unary(inner_operator, inner_expression) => {
+                        // Recur on the inner unary expression
+                        let temp_var = self.get_tmp_var(); // You may need to define how you generate temp identifiers
+                        let inner_instructions =
+                            self.parse_unary(inner_operator, inner_expression, temp_var.clone())?;
+                        instructions.extend(inner_instructions);
 
-                // Now add the current unary operation with the result of the inner expression
-                instructions.push(Instruction::Unary {
-                    operator: unary_operator.clone(),
-                    src: Value::Var(temp_var), // Use the result from the inner expression
-                    dest: Value::Var(dst_name.clone()), // Store the final result in the destination variable
-                });
+                        // Now add the current unary operation with the result of the inner expression
+                        instructions.push(Instruction::Unary {
+                            operator: unary_operator.clone(),
+                            src: Value::Var(temp_var), // Use the result from the inner expression
+                            dest: Value::Var(dst_name.clone()), // Store the final result in the destination variable
+                        });
+                    }
+                    crate::ast::Factor::ParentedExpression(_) => todo!(),
+                }
             }
         }
         Ok(instructions)
