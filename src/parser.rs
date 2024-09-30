@@ -1,4 +1,4 @@
-use std::{clone, path::PathBuf};
+use std::path::PathBuf;
 
 use miette::{Diagnostic, NamedSource, SourceSpan};
 use thiserror::Error;
@@ -199,15 +199,15 @@ impl Parser {
         };
 
         println!("{:?}", expr);
-        if expr.is_ok() && self.check_token(&Token::Semicolon) {
-            self.advance();
-            Ok(Statement::ReturnStatement(Some(expr.expect("msg"))))
-        } else {
-            println!("{}", expr.unwrap_err());
-            Err(self.error(
+        match expr {
+            Ok(val) if self.check_token(&Token::Semicolon) => {
+                self.advance();
+                Ok(Statement::ReturnStatement(Some(val)))
+            }
+            _ => Err(self.error(
                 self.peek().unwrap().clone(),
                 ParserErrorType::MissingReturnValue,
-            ))
+            )),
         }
     }
 
@@ -244,7 +244,7 @@ impl Parser {
         match token.token {
             Token::Constant(c) => {
                 self.advance();
-                return Ok(Expression::Factor(Factor::Constant(c.clone())));
+                return Ok(Expression::Factor(Factor::Constant(c)));
             }
             Token::Hyphen | Token::Tilde => {
                 let operator = UnaryOperator::from_token(&token.token).unwrap();
@@ -266,6 +266,7 @@ impl Parser {
                     .parse_expression()
                     .map(|i| Expression::Factor(Factor::ParentedExpression(Box::new(i))));
                 if self.check_token(&Token::CloseParenthesis) {
+                    self.advance();
                     return inner;
                 } else {
                     return Err("".into());
@@ -275,12 +276,6 @@ impl Parser {
             _ => {}
         };
         Err("".into())
-    }
-
-    /// Peek to see if the next token is a unary operator
-    fn peek_unary_operator(&self) -> Option<UnaryOperator> {
-        self.peek()
-            .and_then(|file_token| UnaryOperator::from_token(&file_token.token))
     }
 
     /// Peek to see if the next token is a binary operator
