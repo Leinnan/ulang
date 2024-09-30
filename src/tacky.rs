@@ -92,7 +92,10 @@ impl Tacky {
         };
         let mut instructions = vec![];
         match return_val {
-            Expression::Binary(binary_operator, expression, expression1) => todo!(),
+            Expression::Binary(expr, oper, expr_2) => {
+                // let left = self.parse_return(&Some(*expr.clone()));
+                // let right = self.parse_return(&Some(*expr.clone()));
+            }
             Expression::Factor(factor) => match factor {
                 crate::ast::Factor::Constant(c) => {
                     instructions.push(Instruction::Return(Value::Constant(*c)))
@@ -107,7 +110,6 @@ impl Tacky {
                     instructions.extend(instructions_unary);
                     instructions.push(Instruction::Return(Value::Var(id)));
                 }
-                crate::ast::Factor::Unary(unary_operator, _) => todo!(),
                 crate::ast::Factor::ParentedExpression(e) => {
                     let mut result = self.parse_return(&Some(*e.clone()))?;
                     instructions.append(&mut result);

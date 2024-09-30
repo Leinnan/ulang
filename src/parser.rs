@@ -224,11 +224,15 @@ impl Parser {
                 return Ok(left);
             };
             let precedence = operator.precedence();
+            println!(
+                "{:?} with {} vs min {}",
+                operator, precedence, min_precedence
+            );
             if min_precedence > precedence {
                 return Ok(left);
             }
             self.advance();
-            let right = self.parse_binary_expression(min_precedence + 1)?;
+            let right = self.parse_binary_expression(precedence + 1)?;
             left = Expression::Binary(Box::new(left), operator, Box::new(right))
         }
     }
