@@ -7,8 +7,8 @@ pub enum TargetPlatform {
 }
 
 use crate::{
-    ast::{Identifier, UnaryOperator},
-    tacky::{TackyProgram, Value},
+    ast::{BinaryOperator, Identifier, UnaryOperator},
+    tacky::{Instruction, TackyProgram, Value},
 };
 
 #[derive(Debug, Clone)]
@@ -34,6 +34,9 @@ pub enum AsmInstruction {
     Mov { src: Operand, dst: Operand },
     Unary(AsmUnaryOperator, Operand),
     AllocateStack(i32),
+    Binary(AsmBinaryOperator, Operand, Operand),
+    Idiv(Operand),
+    Cdq,
     Return,
 }
 
@@ -48,6 +51,35 @@ impl fmt::Display for AsmUnaryOperator {
         match self {
             AsmUnaryOperator::Neg => write!(f, "negl"),
             AsmUnaryOperator::Not => write!(f, "notl"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum AsmBinaryOperator {
+    Add,
+    Sub,
+    Mult,
+}
+
+impl TryFrom<&BinaryOperator> for AsmBinaryOperator {
+    type Error = ();
+    fn try_from(value: &BinaryOperator) -> Result<Self, Self::Error> {
+        match value {
+            BinaryOperator::Add => Ok(AsmBinaryOperator::Add),
+            BinaryOperator::Substract => Ok(AsmBinaryOperator::Sub),
+            BinaryOperator::Multiply => Ok(AsmBinaryOperator::Mult),
+            _ => Err(()),
+        }
+    }
+}
+
+impl fmt::Display for AsmBinaryOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AsmBinaryOperator::Add => write!(f, "addl"),
+            AsmBinaryOperator::Sub => write!(f, "subl"),
+            AsmBinaryOperator::Mult => write!(f, "imull"),
         }
     }
 }
@@ -92,14 +124,24 @@ impl From<&Value> for Operand {
 #[derive(Debug, Clone)]
 pub enum AsmRegistry {
     AX,
+    DX,
     R10,
+    R11,
+}
+
+impl From<AsmRegistry> for Operand {
+    fn from(value: AsmRegistry) -> Self {
+        Operand::Register(value)
+    }
 }
 
 impl fmt::Display for AsmRegistry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            AsmRegistry::DX => write!(f, "%edx"),
             AsmRegistry::AX => write!(f, "%eax"),
             AsmRegistry::R10 => write!(f, "%r10d"),
+            AsmRegistry::R11 => write!(f, "%r11d"),
         }
     }
 }
@@ -112,37 +154,78 @@ impl From<&TackyProgram> for AsmProgram {
             instructions: vec![],
         };
         for instruction in &tacky_function.instruction {
-            match instruction {
-                crate::tacky::Instruction::Binary {
-                    operator,
-                    src1,
-                    src2,
-                    dest,
-                } => todo!(),
-                crate::tacky::Instruction::Return(value) => {
-                    function_def.instructions.push(AsmInstruction::Mov {
-                        src: value.into(),
-                        dst: Operand::Register(AsmRegistry::AX),
-                    });
-                    function_def.instructions.push(AsmInstruction::Return);
-                }
-                crate::tacky::Instruction::Unary {
-                    operator,
-                    src,
-                    dest,
-                } => {
-                    function_def.instructions.push(AsmInstruction::Mov {
-                        src: src.into(),
-                        dst: dest.into(),
-                    });
-                    function_def
-                        .instructions
-                        .push(AsmInstruction::Unary(operator.into(), dest.into()));
-                }
-            }
+            function_def.parse_instruction(instruction);
         }
 
         AsmProgram(function_def)
+    }
+}
+impl AsmFunctionDef {
+    fn parse_instruction(&mut self, instruction: &Instruction) {
+        match instruction {
+            crate::tacky::Instruction::Binary {
+                operator,
+                src1,
+                src2,
+                dest,
+            } => match operator {
+                crate::ast::BinaryOperator::Divide => {
+                    self.instructions.push(AsmInstruction::Mov {
+                        src: src1.into(),
+                        dst: Operand::Register(AsmRegistry::AX),
+                    });
+                    self.instructions.push(AsmInstruction::Cdq);
+                    self.instructions.push(AsmInstruction::Idiv(src2.into()));
+                    self.instructions.push(AsmInstruction::Mov {
+                        src: AsmRegistry::AX.into(),
+                        dst: dest.into(),
+                    });
+                }
+                crate::ast::BinaryOperator::Remainder => {
+                    self.instructions.push(AsmInstruction::Mov {
+                        src: src1.into(),
+                        dst: Operand::Register(AsmRegistry::AX),
+                    });
+                    self.instructions.push(AsmInstruction::Cdq);
+                    self.instructions.push(AsmInstruction::Idiv(src2.into()));
+                    self.instructions.push(AsmInstruction::Mov {
+                        src: AsmRegistry::AX.into(),
+                        dst: dest.into(),
+                    });
+                }
+                o => {
+                    self.instructions.push(AsmInstruction::Mov {
+                        src: src1.into(),
+                        dst: dest.into(),
+                    });
+
+                    self.instructions.push(AsmInstruction::Binary(
+                        o.try_into().unwrap(),
+                        src2.into(),
+                        dest.into(),
+                    ))
+                }
+            },
+            crate::tacky::Instruction::Return(value) => {
+                self.instructions.push(AsmInstruction::Mov {
+                    src: value.into(),
+                    dst: Operand::Register(AsmRegistry::AX),
+                });
+                self.instructions.push(AsmInstruction::Return);
+            }
+            crate::tacky::Instruction::Unary {
+                operator,
+                src,
+                dest,
+            } => {
+                self.instructions.push(AsmInstruction::Mov {
+                    src: src.into(),
+                    dst: dest.into(),
+                });
+                self.instructions
+                    .push(AsmInstruction::Unary(operator.into(), dest.into()));
+            }
+        }
     }
 }
 
@@ -295,6 +378,11 @@ impl AsmProgramWithFixedInstructions {
                 }
                 AsmInstruction::AllocateStack(i) => format!("\tsubq\t{}, %rsp\n", i),
                 AsmInstruction::Return => "\tmovq\t%rbp, %rsp\n\tpopq\t%rbp\n\tret\n".to_string(),
+                AsmInstruction::Cdq => "\tcdq\n".to_string(),
+                AsmInstruction::Binary(operator, op1, op2) => {
+                    format!("\t{}\t{}, {}\n", operator, op1, op2)
+                }
+                AsmInstruction::Idiv(op) => format!("\tidiv\t{}\n", op),
             }
         }
 
