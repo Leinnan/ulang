@@ -266,9 +266,8 @@ impl From<AsmProgram> for AsmProgramWithReplacedPseudoRegisters {
     fn from(value: AsmProgram) -> Self {
         let mut hasher = PseudoRegistryHash::new();
         let mut instructions = value.0.instructions.clone();
-
-        for instruction in instructions.iter_mut() {
-            let mut new_instruction = None;
+        let mut new_instructions = vec![];
+        for (i, instruction) in instructions.iter().enumerate() {
             match &instruction {
                 AsmInstruction::Mov { src, dst } => {
                     let mut src_new = src.clone();
@@ -281,23 +280,29 @@ impl From<AsmProgram> for AsmProgramWithReplacedPseudoRegisters {
                         let val = hasher.get(id);
                         dst_new = Operand::Stack(val);
                     }
-                    new_instruction = Some(AsmInstruction::Mov {
-                        src: src_new,
-                        dst: dst_new,
-                    });
+                    new_instructions.push((
+                        i,
+                        [AsmInstruction::Mov {
+                            src: src_new,
+                            dst: dst_new,
+                        }],
+                    ));
                 }
                 AsmInstruction::Unary(asm_unary_operator, Operand::Pseudo(id)) => {
                     let val = hasher.get(id);
-                    new_instruction = Some(AsmInstruction::Unary(
-                        asm_unary_operator.clone(),
-                        Operand::Stack(val),
+                    new_instructions.push((
+                        i,
+                        [AsmInstruction::Unary(
+                            asm_unary_operator.clone(),
+                            Operand::Stack(val),
+                        )],
                     ));
                 }
                 _ => {}
             }
-            if let Some(new_ins) = new_instruction {
-                *instruction = new_ins;
-            }
+        }
+        for (i, slice) in new_instructions.iter().rev() {
+            replace_with_multiple_elements(&mut instructions, *i, slice);
         }
 
         AsmProgramWithReplacedPseudoRegisters(
@@ -317,14 +322,17 @@ impl From<AsmProgramWithReplacedPseudoRegisters> for AsmProgramWithFixedInstruct
 
         let mut to_be_replaced = vec![];
         for (i, instruction) in instructions.iter().enumerate() {
-            if let AsmInstruction::Mov { src, dst } = instruction {
-                let Operand::Stack(src) = src else {
-                    continue;
-                };
-                let Operand::Stack(dst) = dst else {
-                    continue;
-                };
-                to_be_replaced.push((i, (*src, *dst)));
+            match instruction {
+                AsmInstruction::Mov { src, dst } => {
+                    let Operand::Stack(src) = src else {
+                        continue;
+                    };
+                    let Operand::Stack(dst) = dst else {
+                        continue;
+                    };
+                    to_be_replaced.push((i, (*src, *dst)));
+                }
+                _ => {}
             }
         }
         for (i, ins) in to_be_replaced.iter().rev() {
@@ -356,6 +364,16 @@ fn replace_with_two_elements<T: Clone>(vec: &mut Vec<T>, idx: usize, elem1: T, e
     }
 }
 
+fn replace_with_multiple_elements<T: Clone>(vec: &mut Vec<T>, idx: usize, slice: &[T]) {
+    if idx < vec.len() {
+        // Remove the element at index idx
+        vec.remove(idx);
+        for el in slice.iter().rev() {
+            vec.insert(idx, el.clone());
+        }
+    }
+}
+
 impl AsmProgramWithFixedInstructions {
     pub fn generate(&self, platform: TargetPlatform) -> AsmGenerated {
         let mut result = String::with_capacity(500);
@@ -382,7 +400,7 @@ impl AsmProgramWithFixedInstructions {
                 AsmInstruction::Binary(operator, op1, op2) => {
                     format!("\t{}\t{}, {}\n", operator, op1, op2)
                 }
-                AsmInstruction::Idiv(op) => format!("\tidiv\t{}\n", op),
+                AsmInstruction::Idiv(op) => format!("\tidivl\t{}\n", op),
             }
         }
 
