@@ -25,6 +25,15 @@ pub enum Token {
     Asteriks,
     Slash,
     PercentSign,
+    Not,
+    And,
+    Or,
+    EqualTo,
+    NotEqualTo,
+    LessThan,
+    GreaterThan,
+    LessThanEqualTo,
+    GreaterThanEqualTo,
 }
 
 impl Token {
@@ -35,7 +44,12 @@ impl Token {
             Token::IntKeyword => 3,
             Token::VoidKeyWord => 4,
             Token::ReturnKeyWord => 6,
-            Token::Decrement => 2,
+            Token::Decrement
+            | Token::And
+            | Token::Or
+            | Token::NotEqualTo
+            | Self::LessThanEqualTo
+            | Token::GreaterThanEqualTo => 2,
             _ => 1,
         }
     }
@@ -61,6 +75,15 @@ impl Display for Token {
             Token::Asteriks => f.write_str("*"),
             Token::Slash => f.write_str("/"),
             Token::PercentSign => f.write_str("%"),
+            Token::And => f.write_str("&&"),
+            Token::Not => f.write_str("!"),
+            Token::Or => f.write_str("||"),
+            Token::EqualTo => f.write_str("=="),
+            Token::NotEqualTo => f.write_str("!="),
+            Token::LessThan => f.write_str("<"),
+            Token::GreaterThan => f.write_str(">"),
+            Token::GreaterThanEqualTo => f.write_str(">="),
+            Token::LessThanEqualTo => f.write_str("<="),
         }
     }
 }
