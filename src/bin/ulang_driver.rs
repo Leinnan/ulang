@@ -22,6 +22,8 @@ struct UlangDriver {
     tacky: bool,
     /// File to process
     file: PathBuf,
+    /// Save to file
+    save_path: Option<PathBuf>,
 }
 
 impl UlangDriver {
@@ -110,5 +112,9 @@ fn main() -> Result<()> {
     if opt.codegen {
         exit(0);
     }
+    let Some(path) = opt.save_path else {
+        return Ok(());
+    };
+    std::fs::write(path, asm_final.0);
     Ok(())
 }

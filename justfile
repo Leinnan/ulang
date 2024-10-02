@@ -2,6 +2,9 @@ main:
     cargo run --features="build-binary" -- samples/return_2.c
 
 to_asm:
+    cargo run --features="build-binary" -- samples/return_2.c return_2.s
+
+to_asm_gcc:
     gcc -S -O -fno-asynchronous-unwind-tables -fcf-protection=none samples/return_2.c
 
 run:
