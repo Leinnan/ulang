@@ -189,12 +189,48 @@ impl Lexer {
                 '+' => self.add_token(Token::Plus),
                 '*' => self.add_token(Token::Asteriks),
                 '%' => self.add_token(Token::PercentSign),
+                '=' if iter.next_if_eq(&'=').is_some() => {
+                    self.add_token(Token::EqualTo);
+                    self.nr_in_line += 1;
+                }
+                '&' if iter.next_if_eq(&'&').is_some() => {
+                    self.add_token(Token::And);
+                    self.nr_in_line += 1;
+                }
+                '|' if iter.next_if_eq(&'|').is_some() => {
+                    self.add_token(Token::Or);
+                    self.nr_in_line += 1;
+                }
                 '-' => {
                     if iter.next_if_eq(&'-').is_some() {
                         self.add_token(Token::Decrement);
                         self.nr_in_line += 1;
                     } else {
                         self.add_token(Token::Hyphen);
+                    }
+                }
+                '>' => {
+                    if iter.next_if_eq(&'=').is_some() {
+                        self.add_token(Token::GreaterThanEqualTo);
+                        self.nr_in_line += 1;
+                    } else {
+                        self.add_token(Token::GreaterThan);
+                    }
+                }
+                '<' => {
+                    if iter.next_if_eq(&'=').is_some() {
+                        self.add_token(Token::LessThanEqualTo);
+                        self.nr_in_line += 1;
+                    } else {
+                        self.add_token(Token::LessThan);
+                    }
+                }
+                '!' => {
+                    if iter.next_if_eq(&'=').is_some() {
+                        self.add_token(Token::NotEqualTo);
+                        self.nr_in_line += 1;
+                    } else {
+                        self.add_token(Token::Not);
                     }
                 }
                 '0'..='9' => {

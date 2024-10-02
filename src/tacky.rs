@@ -103,10 +103,10 @@ impl Tacky {
                     src2: v2,
                     dest: Value::Var(dst.clone()),
                 });
-                return Ok(Value::Var(dst));
+                Ok(Value::Var(dst))
             }
             Expression::Factor(factor) => match factor {
-                crate::ast::Factor::Constant(c) => return Ok(Value::Constant(c.clone())),
+                crate::ast::Factor::Constant(c) => Ok(Value::Constant(*c)),
                 crate::ast::Factor::Unary(operator, expression) => {
                     let src = self.parse_node(expression)?;
                     let dest = self.get_tmp_var();
@@ -115,9 +115,9 @@ impl Tacky {
                         src,
                         dest: Value::Var(dest.clone()),
                     });
-                    return Ok(Value::Var(dest));
+                    Ok(Value::Var(dest))
                 }
-                crate::ast::Factor::ParentedExpression(e) => return self.parse_node(e),
+                crate::ast::Factor::ParentedExpression(e) => self.parse_node(e),
             }, // Expression::Identifier(_) => todo!(),
                // Expression::FunctionCall { name, arguments } => todo!(),
         }

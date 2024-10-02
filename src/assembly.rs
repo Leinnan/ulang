@@ -338,17 +338,14 @@ impl From<AsmProgramWithReplacedPseudoRegisters> for AsmProgramWithFixedInstruct
 
         let mut to_be_replaced = vec![];
         for (i, instruction) in instructions.iter().enumerate() {
-            match instruction {
-                AsmInstruction::Mov { src, dst } => {
-                    let Operand::Stack(src) = src else {
-                        continue;
-                    };
-                    let Operand::Stack(dst) = dst else {
-                        continue;
-                    };
-                    to_be_replaced.push((i, (*src, *dst)));
-                }
-                _ => {}
+            if let AsmInstruction::Mov { src, dst } = instruction {
+                let Operand::Stack(src) = src else {
+                    continue;
+                };
+                let Operand::Stack(dst) = dst else {
+                    continue;
+                };
+                to_be_replaced.push((i, (*src, *dst)));
             }
         }
         for (i, ins) in to_be_replaced.iter().rev() {
