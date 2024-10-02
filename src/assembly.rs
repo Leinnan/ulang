@@ -298,6 +298,22 @@ impl From<AsmProgram> for AsmProgramWithReplacedPseudoRegisters {
                         )],
                     ));
                 }
+                AsmInstruction::Binary(operator, o1, o2) => {
+                    let mut src_new = o1.clone();
+                    let mut dst_new = o2.clone();
+                    if let Operand::Pseudo(id) = o1 {
+                        let val = hasher.get(id);
+                        src_new = Operand::Stack(val);
+                    }
+                    if let Operand::Pseudo(id) = o2 {
+                        let val = hasher.get(id);
+                        dst_new = Operand::Stack(val);
+                    }
+                    new_instructions.push((
+                        i,
+                        [AsmInstruction::Binary(operator.clone(), src_new, dst_new)],
+                    ));
+                }
                 _ => {}
             }
         }
