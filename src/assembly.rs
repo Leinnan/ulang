@@ -423,3 +423,13 @@ impl AsmProgramWithFixedInstructions {
         AsmGenerated(result)
     }
 }
+
+pub fn generate_assembly(tacky: &TackyProgram, target: TargetPlatform) -> AsmGenerated {
+    let asm_ast: AsmProgram = tacky.into();
+
+    let asm_replaced: AsmProgramWithReplacedPseudoRegisters = asm_ast.into();
+
+    let asm_fixed: AsmProgramWithFixedInstructions = asm_replaced.into();
+
+    asm_fixed.generate(target)
+}
