@@ -89,6 +89,7 @@ impl From<&UnaryOperator> for AsmUnaryOperator {
         match value {
             UnaryOperator::Complement => AsmUnaryOperator::Not,
             UnaryOperator::Negate => AsmUnaryOperator::Neg,
+            UnaryOperator::Not => todo!(),
         }
     }
 }

@@ -22,6 +22,7 @@ pub enum AstNode {
 pub enum UnaryOperator {
     Complement,
     Negate,
+    Not,
 }
 
 impl UnaryOperator {
@@ -29,6 +30,7 @@ impl UnaryOperator {
         match token {
             Token::Hyphen => Some(UnaryOperator::Negate),
             Token::Tilde => Some(UnaryOperator::Complement),
+            Token::Not => Some(UnaryOperator::Not),
             _ => None,
         }
     }
