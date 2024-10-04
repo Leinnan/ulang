@@ -249,6 +249,12 @@ impl Lexer {
                         }
                     }
                 }
+                // AT LEAST FOR NOW
+                '#' => {
+                    iter.by_ref().find(|&c| c == '\n'); // Skip until end of the line
+                    self.nr_in_line = 0;
+                    self.line_nr += 1;
+                }
                 '/' => {
                     if iter.next_if(|s| s.eq(&'/')).is_some() {
                         // Single line comment (//)
