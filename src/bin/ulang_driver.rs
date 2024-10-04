@@ -113,7 +113,7 @@ fn main() -> Result<()> {
         exit(0);
     }
     let path = opt.save_path.unwrap_or(opt.file.with_extension("s"));
-    std::fs::write(&path, asm_final.0);
+    std::fs::write(&path, asm_final.0).expect("Failed to save file");
     use std::process::Command;
     let cmd = format!(
         "gcc {} -o {}",

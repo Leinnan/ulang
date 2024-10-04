@@ -41,6 +41,14 @@ pub enum BinaryOperator {
     Multiply,
     Divide,
     Remainder,
+    And,
+    Or,
+    Equal,
+    NotEqual,
+    LessThan,
+    LessOrEqual,
+    GreaterThan,
+    GreaterOrEqual,
 }
 
 impl BinaryOperator {
@@ -51,6 +59,14 @@ impl BinaryOperator {
             BinaryOperator::Multiply => 50,
             BinaryOperator::Divide => 50,
             BinaryOperator::Remainder => 50,
+            BinaryOperator::And => 10,
+            BinaryOperator::Or => 5,
+            BinaryOperator::Equal => 30,
+            BinaryOperator::NotEqual => 30,
+            BinaryOperator::LessThan => 35,
+            BinaryOperator::LessOrEqual => 35,
+            BinaryOperator::GreaterThan => 35,
+            BinaryOperator::GreaterOrEqual => 35,
         }
     }
 }
@@ -65,6 +81,14 @@ impl TryFrom<Token> for BinaryOperator {
             Token::Hyphen => Ok(BinaryOperator::Substract),
             Token::PercentSign => Ok(BinaryOperator::Remainder),
             Token::Asteriks => Ok(BinaryOperator::Multiply),
+            Token::And => Ok(BinaryOperator::And),
+            Token::Or => Ok(BinaryOperator::Or),
+            Token::EqualTo => Ok(BinaryOperator::Equal),
+            Token::NotEqualTo => Ok(BinaryOperator::NotEqual),
+            Token::LessThan => Ok(Self::LessThan),
+            Token::LessThanEqualTo => Ok(Self::LessOrEqual),
+            Token::GreaterThan => Ok(Self::GreaterThan),
+            Token::GreaterThanEqualTo => Ok(Self::GreaterOrEqual),
             _ => Err(()),
         }
     }

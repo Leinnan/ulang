@@ -241,6 +241,7 @@ impl Parser {
         let Some(token) = self.peek() else {
             return Err("".into());
         };
+        println!("Parsing factor: {:?}", &token.token);
         match token.token {
             Token::Constant(c) => {
                 self.advance();
@@ -249,16 +250,8 @@ impl Parser {
             Token::Hyphen | Token::Tilde => {
                 let operator = UnaryOperator::from_token(&token.token).unwrap();
                 self.advance();
-                let inner = self.parse_factor();
-                match inner {
-                    Ok(i) => {
-                        return Ok(Expression::Factor(Factor::Unary(
-                            operator,
-                            Box::new(i.clone()),
-                        )))
-                    }
-                    Err(e) => return Err(e),
-                }
+                let inner = self.parse_factor()?;
+                return Ok(Expression::Factor(Factor::Unary(operator, Box::new(inner))));
             }
             Token::OpenParenthesis => {
                 self.advance();
