@@ -112,9 +112,29 @@ fn main() -> Result<()> {
     if opt.codegen {
         exit(0);
     }
-    let Some(path) = opt.save_path else {
-        return Ok(());
+    let path = opt.save_path.unwrap_or(opt.file.with_extension("s"));
+    std::fs::write(&path, asm_final.0);
+    use std::process::Command;
+    let cmd = format!(
+        "gcc {} -o {}",
+        &path.display(),
+        path.with_extension("").display()
+    );
+    println!("Running: {}", &cmd);
+    let output = if cfg!(target_os = "windows") {
+        Command::new("cmd")
+            .args(["/C", &cmd])
+            .output()
+            .expect("failed to execute process")
+    } else {
+        Command::new("sh")
+            .arg("-c")
+            .arg(&cmd)
+            .output()
+            .expect("failed to execute process")
     };
-    std::fs::write(path, asm_final.0);
+
+    let hello = output.stdout;
+    println!("result: {:?}", hello);
     Ok(())
 }
