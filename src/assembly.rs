@@ -1,4 +1,7 @@
-use std::{collections::HashMap, fmt};
+use std::{
+    collections::HashMap,
+    fmt::{self, write},
+};
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum TargetPlatform {
@@ -43,6 +46,7 @@ pub enum AsmInstruction {
 #[derive(Debug, Clone)]
 pub enum AsmUnaryOperator {
     Neg,
+    Complement,
     Not,
 }
 
@@ -50,7 +54,8 @@ impl fmt::Display for AsmUnaryOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             AsmUnaryOperator::Neg => write!(f, "negl"),
-            AsmUnaryOperator::Not => write!(f, "notl"),
+            AsmUnaryOperator::Complement => write!(f, "notl"),
+            Self::Not => write!(f, "dddd"),
         }
     }
 }
@@ -87,9 +92,9 @@ impl fmt::Display for AsmBinaryOperator {
 impl From<&UnaryOperator> for AsmUnaryOperator {
     fn from(value: &UnaryOperator) -> Self {
         match value {
-            UnaryOperator::Complement => AsmUnaryOperator::Not,
+            UnaryOperator::Complement => AsmUnaryOperator::Complement,
             UnaryOperator::Negate => AsmUnaryOperator::Neg,
-            UnaryOperator::Not => todo!(),
+            UnaryOperator::Not => AsmUnaryOperator::Not,
         }
     }
 }
@@ -226,6 +231,7 @@ impl AsmFunctionDef {
                 self.instructions
                     .push(AsmInstruction::Unary(operator.into(), dest.into()));
             }
+            _ => todo!(),
         }
     }
 }

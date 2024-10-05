@@ -23,6 +23,14 @@ pub enum Instruction {
         src2: Value,
         dest: Value,
     },
+    Copy {
+        src: Value,
+        dest: Value,
+    },
+    Jump(Identifier),
+    JumpIfZero(Value, Identifier),
+    JumpIfNotZero(Value, Identifier),
+    Label(Identifier),
 }
 
 #[derive(Debug, Clone)]
