@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    fmt::{self, write},
-};
+use std::{collections::HashMap, fmt};
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum TargetPlatform {
