@@ -365,6 +365,24 @@ impl From<AsmProgram> for AsmProgramWithReplacedPseudoRegisters {
         let mut new_instructions = vec![];
         for (i, instruction) in instructions.iter().enumerate() {
             match &instruction {
+                AsmInstruction::SetCC(cc, Operand::Pseudo(id)) => {
+                    let val = hasher.get(id);
+                    new_instructions
+                        .push((i, [AsmInstruction::SetCC(cc.clone(), Operand::Stack(val))]));
+                }
+                AsmInstruction::Cmp(op1, op2) => {
+                    let mut src_new = op1.clone();
+                    let mut dst_new = op2.clone();
+                    if let Operand::Pseudo(id) = op1 {
+                        let val = hasher.get(id);
+                        src_new = Operand::Stack(val);
+                    }
+                    if let Operand::Pseudo(id) = op2 {
+                        let val = hasher.get(id);
+                        dst_new = Operand::Stack(val);
+                    }
+                    new_instructions.push((i, [AsmInstruction::Cmp(src_new, dst_new)]));
+                }
                 AsmInstruction::Mov { src, dst } => {
                     let mut src_new = src.clone();
                     let mut dst_new = dst.clone();
