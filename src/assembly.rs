@@ -7,8 +7,8 @@ pub enum TargetPlatform {
 }
 
 use crate::{
-    ast::{BinaryOperator, Identifier, UnaryOperator},
-    tacky::{Instruction, TackyProgram, Value},
+    ast::{Identifier, UnaryOperator},
+    tacky::{Instruction, TackyBinaryOperator, TackyProgram, Value},
 };
 
 #[derive(Debug, Clone)]
@@ -64,13 +64,13 @@ pub enum AsmBinaryOperator {
     Mult,
 }
 
-impl TryFrom<&BinaryOperator> for AsmBinaryOperator {
+impl TryFrom<&TackyBinaryOperator> for AsmBinaryOperator {
     type Error = ();
-    fn try_from(value: &BinaryOperator) -> Result<Self, Self::Error> {
+    fn try_from(value: &TackyBinaryOperator) -> Result<Self, Self::Error> {
         match value {
-            BinaryOperator::Add => Ok(AsmBinaryOperator::Add),
-            BinaryOperator::Substract => Ok(AsmBinaryOperator::Sub),
-            BinaryOperator::Multiply => Ok(AsmBinaryOperator::Mult),
+            TackyBinaryOperator::Add => Ok(AsmBinaryOperator::Add),
+            TackyBinaryOperator::Substract => Ok(AsmBinaryOperator::Sub),
+            TackyBinaryOperator::Multiply => Ok(AsmBinaryOperator::Mult),
             _ => Err(()),
         }
     }
@@ -172,7 +172,7 @@ impl AsmFunctionDef {
                 src2,
                 dest,
             } => match operator {
-                crate::ast::BinaryOperator::Divide => {
+                TackyBinaryOperator::Divide => {
                     self.instructions.push(AsmInstruction::Mov {
                         src: src1.into(),
                         dst: Operand::Register(AsmRegistry::AX),
@@ -184,7 +184,7 @@ impl AsmFunctionDef {
                         dst: dest.into(),
                     });
                 }
-                crate::ast::BinaryOperator::Remainder => {
+                TackyBinaryOperator::Remainder => {
                     self.instructions.push(AsmInstruction::Mov {
                         src: src1.into(),
                         dst: Operand::Register(AsmRegistry::AX),

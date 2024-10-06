@@ -10,6 +10,42 @@ pub struct FunctionDefinition {
 }
 
 #[derive(Debug, Clone)]
+pub enum TackyBinaryOperator {
+    Add,
+    Substract,
+    Multiply,
+    Divide,
+    Remainder,
+    Equal,
+    NotEqual,
+    LessThan,
+    LessOrEqual,
+    GreaterThan,
+    GreaterOrEqual,
+}
+
+impl TryFrom<&BinaryOperator> for TackyBinaryOperator {
+    type Error = ();
+
+    fn try_from(value: &BinaryOperator) -> Result<Self, Self::Error> {
+        match value {
+            BinaryOperator::And | BinaryOperator::Or => Err(()),
+            BinaryOperator::Add => Ok(TackyBinaryOperator::Add),
+            BinaryOperator::Substract => Ok(TackyBinaryOperator::Substract),
+            BinaryOperator::Multiply => Ok(TackyBinaryOperator::Multiply),
+            BinaryOperator::Divide => Ok(TackyBinaryOperator::Divide),
+            BinaryOperator::Remainder => Ok(TackyBinaryOperator::Remainder),
+            BinaryOperator::Equal => Ok(TackyBinaryOperator::Equal),
+            BinaryOperator::NotEqual => Ok(TackyBinaryOperator::NotEqual),
+            BinaryOperator::LessThan => Ok(TackyBinaryOperator::LessThan),
+            BinaryOperator::LessOrEqual => Ok(TackyBinaryOperator::GreaterOrEqual),
+            BinaryOperator::GreaterThan => Ok(TackyBinaryOperator::GreaterThan),
+            BinaryOperator::GreaterOrEqual => Ok(TackyBinaryOperator::GreaterOrEqual),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum Instruction {
     Return(Value),
     Unary {
@@ -18,7 +54,7 @@ pub enum Instruction {
         dest: Value,
     },
     Binary {
-        operator: BinaryOperator,
+        operator: TackyBinaryOperator,
         src1: Value,
         src2: Value,
         dest: Value,
@@ -105,8 +141,11 @@ impl Tacky {
                 let v1 = self.parse_node(expr)?;
                 let v2 = self.parse_node(expr_2)?;
                 let dst = self.get_tmp_var();
+                let Ok(operator) = oper.try_into() else {
+                    return Err("TTT".into());
+                };
                 self.result.instruction.push(Instruction::Binary {
-                    operator: oper.clone(),
+                    operator,
                     src1: v1,
                     src2: v2,
                     dest: Value::Var(dst.clone()),
