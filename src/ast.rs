@@ -1,7 +1,15 @@
+use std::fmt;
+
 use crate::lexer::Token;
 
 #[derive(Debug, Clone, Hash, PartialEq, PartialOrd, Ord, Eq)]
 pub struct Identifier(pub String);
+
+impl fmt::Display for Identifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &self.0)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum AstNode {
@@ -36,7 +44,7 @@ impl UnaryOperator {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BinaryOperator {
     Add,
     Substract,

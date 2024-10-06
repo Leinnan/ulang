@@ -33,11 +33,55 @@ pub struct AsmFunctionDef {
 pub enum AsmInstruction {
     Mov { src: Operand, dst: Operand },
     Unary(AsmUnaryOperator, Operand),
+    Cmp(Operand, Operand),
     AllocateStack(i32),
     Binary(AsmBinaryOperator, Operand, Operand),
     Idiv(Operand),
     Cdq,
+    Jmp(Identifier),
+    JmpCC(ConditionCode, Identifier),
+    SetCC(ConditionCode, Operand),
+    Label(Identifier),
     Return,
+}
+
+#[derive(Debug, Clone)]
+pub enum ConditionCode {
+    E,
+    NE,
+    G,
+    GE,
+    L,
+    LE,
+}
+
+impl TryFrom<&TackyBinaryOperator> for ConditionCode {
+    type Error = ();
+    fn try_from(value: &TackyBinaryOperator) -> Result<Self, Self::Error> {
+        match value {
+            TackyBinaryOperator::LessThan => Ok(ConditionCode::L),
+            TackyBinaryOperator::LessOrEqual => Ok(ConditionCode::LE),
+            TackyBinaryOperator::GreaterThan => Ok(ConditionCode::G),
+            TackyBinaryOperator::GreaterOrEqual => Ok(ConditionCode::GE),
+            TackyBinaryOperator::Equal => Ok(ConditionCode::E),
+            TackyBinaryOperator::NotEqual => Ok(ConditionCode::NE),
+            _ => Err(()),
+        }
+    }
+}
+
+impl fmt::Display for ConditionCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            ConditionCode::E => "e",
+            ConditionCode::NE => "ne",
+            ConditionCode::G => "g",
+            ConditionCode::GE => "ge",
+            ConditionCode::L => "l",
+            ConditionCode::LE => "le",
+        };
+        write!(f, "{}", s)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -166,6 +210,22 @@ impl From<&TackyProgram> for AsmProgram {
 impl AsmFunctionDef {
     fn parse_instruction(&mut self, instruction: &Instruction) {
         match instruction {
+            Instruction::Jump(id) => self.instructions.push(AsmInstruction::Jmp(id.clone())),
+            Instruction::Label(id) => self.instructions.push(AsmInstruction::Label(id.clone())),
+            crate::tacky::Instruction::JumpIfZero(val, id) => {
+                let value = val.into();
+                self.instructions
+                    .push(AsmInstruction::Cmp(Operand::Imm(0), value));
+                self.instructions
+                    .push(AsmInstruction::JmpCC(ConditionCode::E, id.clone()));
+            }
+            crate::tacky::Instruction::JumpIfNotZero(val, id) => {
+                let value = val.into();
+                self.instructions
+                    .push(AsmInstruction::Cmp(Operand::Imm(0), value));
+                self.instructions
+                    .push(AsmInstruction::JmpCC(ConditionCode::NE, id.clone()));
+            }
             crate::tacky::Instruction::Binary {
                 operator,
                 src1,
@@ -197,13 +257,28 @@ impl AsmFunctionDef {
                     });
                 }
                 o => {
+                    if let Ok(condition_code) = o.try_into() {
+                        self.instructions
+                            .push(AsmInstruction::Cmp(src2.into(), src1.into()));
+                        self.instructions.push(AsmInstruction::Mov {
+                            src: Operand::Imm(0),
+                            dst: dest.into(),
+                        });
+                        self.instructions
+                            .push(AsmInstruction::SetCC(condition_code, dest.into()));
+                        return;
+                    }
                     self.instructions.push(AsmInstruction::Mov {
                         src: src1.into(),
                         dst: dest.into(),
                     });
 
+                    let Ok(operator) = o.try_into() else {
+                        panic!("FAILED TO CONVERT {:?}", o);
+                    };
+
                     self.instructions.push(AsmInstruction::Binary(
-                        o.try_into().unwrap(),
+                        operator,
                         src2.into(),
                         dest.into(),
                     ))
@@ -220,15 +295,32 @@ impl AsmFunctionDef {
                 operator,
                 src,
                 dest,
-            } => {
+            } => match operator {
+                UnaryOperator::Not => {
+                    self.instructions
+                        .push(AsmInstruction::Cmp(Operand::Imm(0), src.into()));
+                    self.instructions.push(AsmInstruction::Mov {
+                        src: Operand::Imm(0),
+                        dst: dest.into(),
+                    });
+                    self.instructions
+                        .push(AsmInstruction::SetCC(ConditionCode::E, dest.into()));
+                }
+                _ => {
+                    self.instructions.push(AsmInstruction::Mov {
+                        src: src.into(),
+                        dst: dest.into(),
+                    });
+                    self.instructions
+                        .push(AsmInstruction::Unary(operator.into(), dest.into()));
+                }
+            },
+            Instruction::Copy { src, dest } => {
                 self.instructions.push(AsmInstruction::Mov {
                     src: src.into(),
                     dst: dest.into(),
                 });
-                self.instructions
-                    .push(AsmInstruction::Unary(operator.into(), dest.into()));
             }
-            _ => todo!(),
         }
     }
 }
@@ -418,6 +510,11 @@ impl AsmProgramWithFixedInstructions {
                     format!("\t{}\t{}, {}\n", operator, op1, op2)
                 }
                 AsmInstruction::Idiv(op) => format!("\tidivl\t{}\n", op),
+                AsmInstruction::Cmp(o, o2) => format!("\tcmpl\t{}, {}\n", o, o2),
+                AsmInstruction::Jmp(id) => format!("\tjmp\t.L{}\n", id),
+                AsmInstruction::JmpCC(cc, o) => format!("\tj{}\t.L{}\n", cc, o),
+                AsmInstruction::SetCC(cc, o) => format!("\tset{}\t{}\n", cc, o),
+                AsmInstruction::Label(id) => format!(".L{}\n", id),
             }
         }
 

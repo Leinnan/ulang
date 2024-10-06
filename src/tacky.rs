@@ -141,15 +141,57 @@ impl Tacky {
                 let v1 = self.parse_node(expr)?;
                 let v2 = self.parse_node(expr_2)?;
                 let dst = self.get_tmp_var();
-                let Ok(operator) = oper.try_into() else {
-                    return Err("TTT".into());
+                if let Ok(operator) = oper.try_into() {
+                    self.result.instruction.push(Instruction::Binary {
+                        operator,
+                        src1: v1,
+                        src2: v2,
+                        dest: Value::Var(dst.clone()),
+                    });
+                    return Ok(Value::Var(dst));
+                }
+                let assign_label = self.get_jump_tmp_var();
+                let end_label = self.get_jump_tmp_var();
+                let command_one = if oper == &BinaryOperator::And {
+                    Instruction::JumpIfZero(v1, assign_label.clone())
+                } else {
+                    Instruction::JumpIfNotZero(v1, assign_label.clone())
                 };
-                self.result.instruction.push(Instruction::Binary {
-                    operator,
-                    src1: v1,
-                    src2: v2,
+                let command_two = if oper == &BinaryOperator::And {
+                    Instruction::JumpIfZero(v2, assign_label.clone())
+                } else {
+                    Instruction::JumpIfNotZero(v2, assign_label.clone())
+                };
+                let first_result = if oper == &BinaryOperator::And {
+                    Value::Constant(1)
+                } else {
+                    Value::Constant(0)
+                };
+                let second_result = if oper == &BinaryOperator::And {
+                    Value::Constant(0)
+                } else {
+                    Value::Constant(1)
+                };
+                self.result.instruction.push(command_one);
+                self.result.instruction.push(command_two);
+                self.result.instruction.push(Instruction::Copy {
+                    src: first_result,
                     dest: Value::Var(dst.clone()),
                 });
+                self.result
+                    .instruction
+                    .push(Instruction::Jump(end_label.clone()));
+                self.result
+                    .instruction
+                    .push(Instruction::Label(assign_label.clone()));
+                self.result.instruction.push(Instruction::Copy {
+                    src: second_result,
+                    dest: Value::Var(dst.clone()),
+                });
+                self.result
+                    .instruction
+                    .push(Instruction::Label(end_label.clone()));
+
                 Ok(Value::Var(dst))
             }
             Expression::Factor(factor) => match factor {
@@ -174,5 +216,10 @@ impl Tacky {
         let nr = self.counter;
         self.counter += 1;
         Identifier(format!("tmp.{nr}"))
+    }
+    fn get_jump_tmp_var(&mut self) -> Identifier {
+        let nr = self.counter;
+        self.counter += 1;
+        Identifier(format!("jump.{nr}"))
     }
 }
