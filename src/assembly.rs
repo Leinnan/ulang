@@ -21,6 +21,9 @@ pub struct AsmProgramWithReplacedPseudoRegisters(pub AsmProgram, i32);
 pub struct AsmProgramWithFixedInstructions(pub AsmProgram);
 
 #[derive(Debug, Clone)]
+pub struct AsmWithFixedCmp(pub AsmProgram);
+
+#[derive(Debug, Clone)]
 pub struct AsmGenerated(pub String);
 
 #[derive(Debug, Clone)]
@@ -152,7 +155,7 @@ impl fmt::Display for Operand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Operand::Register(asm_registry) => write!(f, "{}", asm_registry),
-            Operand::Imm(i) => write!(f, "{}", i),
+            Operand::Imm(i) => write!(f, "${}", i),
             Operand::Stack(i) => write!(f, "{}(%rbp)", i),
             Operand::Pseudo(identifier) => write!(f, "PSEUDO_{}", &identifier.0),
         }
@@ -480,6 +483,32 @@ impl From<AsmProgramWithReplacedPseudoRegisters> for AsmProgramWithFixedInstruct
     }
 }
 
+impl From<AsmProgramWithFixedInstructions> for AsmWithFixedCmp {
+    fn from(value: AsmProgramWithFixedInstructions) -> Self {
+        let mut instructions = vec![];
+        instructions.extend(value.0 .0.instructions.clone());
+
+        let mut to_be_replaced = vec![];
+        for (i, instruction) in instructions.iter().enumerate() {
+            if let AsmInstruction::Cmp(src, dst) = instruction {
+                to_be_replaced.push((i, (src.clone(), dst.clone())));
+            }
+        }
+        for (i, ins) in to_be_replaced.iter().rev() {
+            let first = AsmInstruction::Mov {
+                src: ins.0.clone(),
+                dst: Operand::Register(AsmRegistry::R10),
+            };
+            let second = AsmInstruction::Cmp(Operand::Register(AsmRegistry::R10), ins.1.clone());
+            replace_with_two_elements(&mut instructions, *i, first, second);
+        }
+        AsmWithFixedCmp(AsmProgram(AsmFunctionDef {
+            name: value.0 .0.name.clone(),
+            instructions,
+        }))
+    }
+}
+
 fn replace_with_two_elements<T: Clone>(vec: &mut Vec<T>, idx: usize, elem1: T, elem2: T) {
     if idx < vec.len() {
         // Remove the element at index idx
@@ -501,38 +530,38 @@ fn replace_with_multiple_elements<T: Clone>(vec: &mut Vec<T>, idx: usize, slice:
     }
 }
 
-impl AsmProgramWithFixedInstructions {
+impl AsmWithFixedCmp {
     pub fn generate(&self, platform: TargetPlatform) -> AsmGenerated {
         let mut result = String::with_capacity(500);
 
         let function_def = &self.0 .0;
         if platform == TargetPlatform::MacOsX64 {
             result += &format!("\t.globl _{}\n", function_def.name);
-            result += &format!("._{}\n", function_def.name);
+            result += &format!("_{}:\n", function_def.name);
         } else {
             result += &format!("\t.globl {}\n", function_def.name);
-            result += &format!(".{}\n", function_def.name);
+            result += &format!(".{}:\n", function_def.name);
         }
-        result += "\tpushq\t%rbp\n";
-        result += "\tmovq\t%rsp, %rbp\n";
+        result += "\tpush\t%rbp\n";
+        result += "\tmov\t%rsp, %rbp\n";
         for instruction in function_def.instructions.iter() {
             result += &match instruction {
                 AsmInstruction::Mov { src, dst } => format!("\tmovl\t{}, {}\n", src, dst),
                 AsmInstruction::Unary(asm_unary_operator, operand) => {
                     format!("\t{}\t{}\n", asm_unary_operator, operand)
                 }
-                AsmInstruction::AllocateStack(i) => format!("\tsubq\t{}, %rsp\n", i),
+                AsmInstruction::AllocateStack(i) => format!("\tsubq ${}, %rsp\n", i),
                 AsmInstruction::Return => "\tmovq\t%rbp, %rsp\n\tpopq\t%rbp\n\tret\n".to_string(),
                 AsmInstruction::Cdq => "\tcdq\n".to_string(),
                 AsmInstruction::Binary(operator, op1, op2) => {
                     format!("\t{}\t{}, {}\n", operator, op1, op2)
                 }
                 AsmInstruction::Idiv(op) => format!("\tidivl\t{}\n", op),
-                AsmInstruction::Cmp(o, o2) => format!("\tcmpl\t{}, {}\n", o, o2),
+                AsmInstruction::Cmp(o, o2) => format!("\tcmpl\t{}, {}\n", o2, o),
                 AsmInstruction::Jmp(id) => format!("\tjmp\t.L{}\n", id),
                 AsmInstruction::JmpCC(cc, o) => format!("\tj{}\t.L{}\n", cc, o),
                 AsmInstruction::SetCC(cc, o) => format!("\tset{}\t{}\n", cc, o),
-                AsmInstruction::Label(id) => format!(".L{}\n", id),
+                AsmInstruction::Label(id) => format!(".L{}:\n", id),
             }
         }
 
@@ -550,5 +579,7 @@ pub fn generate_assembly(tacky: &TackyProgram, target: TargetPlatform) -> AsmGen
 
     let asm_fixed: AsmProgramWithFixedInstructions = asm_replaced.into();
 
-    asm_fixed.generate(target)
+    let asm_fixed_2: AsmWithFixedCmp = asm_fixed.into();
+
+    asm_fixed_2.generate(target)
 }

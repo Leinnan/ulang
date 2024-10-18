@@ -5,10 +5,14 @@ to_asm:
     cargo run --features="build-binary" -- samples/return_2.c return_2.s
 
 to_asm_gcc:
-    gcc -S -O -fno-asynchronous-unwind-tables -fcf-protection=none samples/return_2.c
+    gcc -arch x86_64 -S -O -fno-asynchronous-unwind-tables -fcf-protection=none samples/return_2.c
 
 run:
-    gcc return_2.s -o return_2
+    gcc -arch x86_64 -masm=intel return_2.s -o return_2
+    ./return_2 || echo $?
+
+run_other: main
+    clang -arch x86_64 samples/return_2.s -o return_2
     ./return_2 || echo $?
 
 preprocess:

@@ -92,21 +92,11 @@ fn main() -> Result<()> {
         exit(0);
     }
 
-    let asm_ast: ulang::assembly::AsmProgram = (&result).into();
-    println!("ASM AST: {:#?}", asm_ast);
-
-    let asm_replaced: ulang::assembly::AsmProgramWithReplacedPseudoRegisters = asm_ast.into();
-    println!("ASM Replaced: {:#?}", asm_replaced);
-
-    let asm_fixed: ulang::assembly::AsmProgramWithFixedInstructions = asm_replaced.into();
-    println!("ASM Fixed: {:#?}", asm_fixed);
-
     #[cfg(target_os = "linux")]
     let target = assembly::TargetPlatform::X64Linux;
     #[cfg(not(target_os = "linux"))]
     let target = assembly::TargetPlatform::MacOsX64;
-
-    let asm_final = asm_fixed.generate(target);
+    let asm_final = ulang::assembly::generate_assembly(&result, target);
     println!("{}", asm_final.0);
 
     if opt.codegen {
