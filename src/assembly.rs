@@ -455,6 +455,14 @@ impl From<AsmProgramWithReplacedPseudoRegisters> for AsmProgramWithFixedInstruct
 
         let mut to_be_replaced = vec![];
         for (i, instruction) in instructions.iter().enumerate() {
+            if let AsmInstruction::Cmp(src, dst) = instruction {
+                let first = AsmInstruction::Mov {
+                    src: src.clone(),
+                    dst: Operand::Register(AsmRegistry::R10),
+                };
+                let second = AsmInstruction::Cmp(Operand::Register(AsmRegistry::R10), dst.clone());
+                to_be_replaced.push((i, (first, second)));
+            }
             if let AsmInstruction::Mov { src, dst } = instruction {
                 let Operand::Stack(src) = src else {
                     continue;
@@ -462,47 +470,21 @@ impl From<AsmProgramWithReplacedPseudoRegisters> for AsmProgramWithFixedInstruct
                 let Operand::Stack(dst) = dst else {
                     continue;
                 };
-                to_be_replaced.push((i, (*src, *dst)));
+                let first = AsmInstruction::Mov {
+                    src: Operand::Stack(*src),
+                    dst: Operand::Register(AsmRegistry::R10),
+                };
+                let second = AsmInstruction::Mov {
+                    src: Operand::Register(AsmRegistry::R10),
+                    dst: Operand::Stack(*dst),
+                };
+                to_be_replaced.push((i, (first, second)));
             }
         }
         for (i, ins) in to_be_replaced.iter().rev() {
-            let first = AsmInstruction::Mov {
-                src: Operand::Stack(ins.0),
-                dst: Operand::Register(AsmRegistry::R10),
-            };
-            let second = AsmInstruction::Mov {
-                src: Operand::Register(AsmRegistry::R10),
-                dst: Operand::Stack(ins.1),
-            };
-            replace_with_two_elements(&mut instructions, *i, first, second);
+            replace_with_two_elements(&mut instructions, *i, ins.0.clone(), ins.1.clone());
         }
         AsmProgramWithFixedInstructions(AsmProgram(AsmFunctionDef {
-            name: value.0 .0.name.clone(),
-            instructions,
-        }))
-    }
-}
-
-impl From<AsmProgramWithFixedInstructions> for AsmWithFixedCmp {
-    fn from(value: AsmProgramWithFixedInstructions) -> Self {
-        let mut instructions = vec![];
-        instructions.extend(value.0 .0.instructions.clone());
-
-        let mut to_be_replaced = vec![];
-        for (i, instruction) in instructions.iter().enumerate() {
-            if let AsmInstruction::Cmp(src, dst) = instruction {
-                to_be_replaced.push((i, (src.clone(), dst.clone())));
-            }
-        }
-        for (i, ins) in to_be_replaced.iter().rev() {
-            let first = AsmInstruction::Mov {
-                src: ins.0.clone(),
-                dst: Operand::Register(AsmRegistry::R10),
-            };
-            let second = AsmInstruction::Cmp(Operand::Register(AsmRegistry::R10), ins.1.clone());
-            replace_with_two_elements(&mut instructions, *i, first, second);
-        }
-        AsmWithFixedCmp(AsmProgram(AsmFunctionDef {
             name: value.0 .0.name.clone(),
             instructions,
         }))
@@ -530,7 +512,7 @@ fn replace_with_multiple_elements<T: Clone>(vec: &mut Vec<T>, idx: usize, slice:
     }
 }
 
-impl AsmWithFixedCmp {
+impl AsmProgramWithFixedInstructions {
     pub fn generate(&self, platform: TargetPlatform) -> AsmGenerated {
         let mut result = String::with_capacity(500);
 
@@ -579,7 +561,5 @@ pub fn generate_assembly(tacky: &TackyProgram, target: TargetPlatform) -> AsmGen
 
     let asm_fixed: AsmProgramWithFixedInstructions = asm_replaced.into();
 
-    let asm_fixed_2: AsmWithFixedCmp = asm_fixed.into();
-
-    asm_fixed_2.generate(target)
+    asm_fixed.generate(target)
 }
