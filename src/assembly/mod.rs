@@ -455,50 +455,88 @@ impl From<AsmProgramWithReplacedPseudoRegisters> for AsmProgramWithFixedInstruct
 
         let mut to_be_replaced = vec![];
         for (i, instruction) in instructions.iter().enumerate() {
-            if let AsmInstruction::Cmp(src, dst) = instruction {
-                let first = AsmInstruction::Mov {
-                    src: src.clone(),
-                    dst: Operand::Register(AsmRegistry::R10),
-                };
-                let second = AsmInstruction::Cmp(Operand::Register(AsmRegistry::R10), dst.clone());
-                to_be_replaced.push((i, (first, second)));
-            }
-            if let AsmInstruction::Mov { src, dst } = instruction {
-                let Operand::Stack(src) = src else {
-                    continue;
-                };
-                let Operand::Stack(dst) = dst else {
-                    continue;
-                };
-                let first = AsmInstruction::Mov {
-                    src: Operand::Stack(*src),
-                    dst: Operand::Register(AsmRegistry::R10),
-                };
-                let second = AsmInstruction::Mov {
-                    src: Operand::Register(AsmRegistry::R10),
-                    dst: Operand::Stack(*dst),
-                };
-                to_be_replaced.push((i, (first, second)));
+            match instruction {
+                AsmInstruction::Cmp(src, dst) => {
+                    let first = AsmInstruction::Mov {
+                        src: src.clone(),
+                        dst: Operand::Register(AsmRegistry::R10),
+                    };
+                    let second =
+                        AsmInstruction::Cmp(Operand::Register(AsmRegistry::R10), dst.clone());
+                    to_be_replaced.push((i, [first, second].to_vec()));
+                }
+                AsmInstruction::Mov { src, dst } => {
+                    let Operand::Stack(src) = src else {
+                        continue;
+                    };
+                    let Operand::Stack(dst) = dst else {
+                        continue;
+                    };
+                    let first = AsmInstruction::Mov {
+                        src: Operand::Stack(*src),
+                        dst: Operand::Register(AsmRegistry::R10),
+                    };
+                    let second = AsmInstruction::Mov {
+                        src: Operand::Register(AsmRegistry::R10),
+                        dst: Operand::Stack(*dst),
+                    };
+                    to_be_replaced.push((i, [first, second].to_vec()));
+                }
+                AsmInstruction::Binary(AsmBinaryOperator::Mult, src, dst) => {
+                    let first = AsmInstruction::Mov {
+                        src: dst.clone(),
+                        dst: Operand::Register(AsmRegistry::R11),
+                    };
+                    let second = AsmInstruction::Binary(
+                        AsmBinaryOperator::Mult,
+                        src.clone(),
+                        Operand::Register(AsmRegistry::R11),
+                    );
+                    let third = AsmInstruction::Mov {
+                        src: Operand::Register(AsmRegistry::R11),
+                        dst: dst.clone(),
+                    };
+                    to_be_replaced.push((i, [first, second, third].to_vec()));
+                }
+                AsmInstruction::Binary(operator, src, dst) => {
+                    let Operand::Stack(src) = src else {
+                        continue;
+                    };
+                    let Operand::Stack(dst) = dst else {
+                        continue;
+                    };
+                    let first = AsmInstruction::Mov {
+                        src: Operand::Stack(*src),
+                        dst: Operand::Register(AsmRegistry::R10),
+                    };
+                    let second = AsmInstruction::Binary(
+                        operator.clone(),
+                        Operand::Register(AsmRegistry::R10),
+                        Operand::Stack(*dst),
+                    );
+                    to_be_replaced.push((i, [first, second].to_vec()));
+                }
+                AsmInstruction::Idiv(op) => {
+                    let Operand::Imm(value) = op else {
+                        continue;
+                    };
+                    let first = AsmInstruction::Mov {
+                        src: Operand::Imm(*value),
+                        dst: Operand::Register(AsmRegistry::R10),
+                    };
+                    let second = AsmInstruction::Idiv(Operand::Register(AsmRegistry::R10));
+                    to_be_replaced.push((i, [first, second].to_vec()));
+                }
+                _ => {}
             }
         }
         for (i, ins) in to_be_replaced.iter().rev() {
-            replace_with_two_elements(&mut instructions, *i, ins.0.clone(), ins.1.clone());
+            replace_with_multiple_elements(&mut instructions, *i, ins);
         }
         AsmProgramWithFixedInstructions(AsmProgram(AsmFunctionDef {
             name: value.0 .0.name.clone(),
             instructions,
         }))
-    }
-}
-
-fn replace_with_two_elements<T: Clone>(vec: &mut Vec<T>, idx: usize, elem1: T, elem2: T) {
-    if idx < vec.len() {
-        // Remove the element at index idx
-        vec.remove(idx);
-        // Insert the second element at idx (this keeps the order correct)
-        vec.insert(idx, elem2);
-        // Insert the first element at idx (this will now be at the original position)
-        vec.insert(idx, elem1);
     }
 }
 
